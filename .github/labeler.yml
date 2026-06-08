@@ -1,0 +1,34 @@
+# Auto-label pull requests by changed paths
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '*.md'
+          - docs/**/*
+
+source:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'origin-core/src/**/*'
+          - 'origin-cli/src/**/*'
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'origin-core/tests/**/*'
+
+CI:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**/*'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/Cargo.toml'
+          - '**/Cargo.lock'
+
+examples:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'examples/**/*'

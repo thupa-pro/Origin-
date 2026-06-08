@@ -20,7 +20,7 @@ This project follows the [Rust Code of Conduct](https://www.rust-lang.org/polici
 
 ### Reporting Bugs
 
-Open a [GitHub Issue](https://github.com/thupa-pro/Origin-/issues) with:
+Open a [GitHub Issue](https://github.com/thupa-pro/Origin/issues) with:
 - A clear title
 - Steps to reproduce
 - Expected vs actual behavior
@@ -28,7 +28,7 @@ Open a [GitHub Issue](https://github.com/thupa-pro/Origin-/issues) with:
 
 ### Suggesting Features
 
-Open a [GitHub Discussion](https://github.com/thupa-pro/Origin-/discussions) first. Protocol changes must go through the RFC process.
+Open a [GitHub Discussion](https://github.com/thupa-pro/Origin/discussions) first. Protocol changes must go through the RFC process.
 
 ### Pull Requests
 
@@ -74,8 +74,8 @@ Any change to the statement format, canonical body, or verification algorithm re
 ## Development Setup
 
 ```bash
-git clone https://github.com/thupa-pro/Origin-.git
-cd Origin-
+git clone https://github.com/thupa-pro/Origin.git
+cd Origin
 cargo test
 cargo build --release
 ```
@@ -84,4 +84,4 @@ The core library is at `origin-core/`. The CLI is at `origin-cli/`.
 
 ## Questions
 
-Open a [GitHub Discussion](https://github.com/thupa-pro/Origin-/discussions) for questions.
+Open a [GitHub Discussion](https://github.com/thupa-pro/Origin/discussions) for questions.

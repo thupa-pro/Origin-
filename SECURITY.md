@@ -10,7 +10,7 @@
 ## Reporting a Vulnerability
 
 Please report security vulnerabilities by opening a
-[GitHub Security Advisory](https://github.com/thupa-pro/Origin-/security/advisories/new).
+[GitHub Security Advisory](https://github.com/thupa-pro/Origin/security/advisories/new).
 
 **Do not open a public issue for security vulnerabilities.**
 

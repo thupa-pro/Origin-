@@ -1,0 +1,11 @@
+# Disallow unwrap() and expect() in non-test code
+# (test code may use them for brevity)
+# Disable: unwrap_used, expect_used, panic
+
+# Style
+cognitive-complexity = 25
+cyclomatic-complexity = 30
+
+# Restrict certain patterns
+# unrestrictive-result-clone: allow
+# result-large-err: allow

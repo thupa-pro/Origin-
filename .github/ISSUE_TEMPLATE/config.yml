@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/thupa-pro/Origin/discussions
+    about: Questions, ideas, and general discussion
+  - name: Security Issues
+    url: https://github.com/thupa-pro/Origin/security/advisories/new
+    about: Report security vulnerabilities via GitHub Security Advisory

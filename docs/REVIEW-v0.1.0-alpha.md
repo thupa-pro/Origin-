@@ -3,7 +3,7 @@
 **Reviewer:** Origin Founding Team  
 **Date:** 2026-06-08  
 **Against:** `v0.1.0-alpha` (commit `84e64ad`)  
-**Repository:** `github.com/thupa-pro/Origin-`
+**Repository:** `github.com/thupa-pro/Origin`
 
 ---
 

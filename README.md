@@ -1,6 +1,7 @@
-[![CI](https://github.com/thupa-pro/Origin-/actions/workflows/ci.yml/badge.svg)](https://github.com/thupa-pro/Origin-/actions/workflows/ci.yml)
+[![CI](https://github.com/thupa-pro/Origin/actions/workflows/ci.yml/badge.svg)](https://github.com/thupa-pro/Origin/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Version](https://img.shields.io/github/v/tag/thupa-pro/Origin-)](https://github.com/thupa-pro/Origin-/tags)
+[![Version](https://img.shields.io/github/v/tag/thupa-pro/Origin)](https://github.com/thupa-pro/Origin/tags)
+[![MSRV](https://img.shields.io/badge/rust-1.85%2B-purple)](rust-toolchain.toml)
 
 # Origin — Cryptographic Provenance for Digital Artifacts
 
@@ -66,8 +67,8 @@ cargo install origin-cli
 
 Or build from source:
 ```bash
-git clone https://github.com/thupa-pro/Origin-.git
-cd Origin-
+git clone https://github.com/thupa-pro/Origin.git
+cd Origin
 cargo build --release
 ./target/release/origin --help
 ```
@@ -264,8 +265,8 @@ See [THREAT_MODEL.md](docs/THREAT_MODEL.md) and [TRUST_MODEL.md](docs/TRUST_MODE
 Requires Rust 1.85+.
 
 ```bash
-gh repo clone thupa-pro/Origin-
-cd Origin-
+gh repo clone thupa-pro/Origin
+cd Origin
 cargo build --release
 ```
 
