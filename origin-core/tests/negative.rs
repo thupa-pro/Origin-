@@ -14,9 +14,18 @@ fn valid_minimal() -> Vec<u8> {
     b"origin: v1\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n".to_vec()
 }
 
+fn valid_with_parent() -> Vec<u8> {
+    b"origin: v1\nparent: sha256:1111111111111111111111111111111111111111111111111111111111111111\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n".to_vec()
+}
+
 #[test]
 fn test_parse_valid() {
     assert_parse_ok(&valid_minimal(), "valid minimal statement");
+}
+
+#[test]
+fn test_parse_valid_with_parent() {
+    assert_parse_ok(&valid_with_parent(), "valid statement with parent");
 }
 
 // ── Structural ──
@@ -28,8 +37,10 @@ fn test_too_few_lines() {
 
 #[test]
 fn test_too_many_lines() {
+    // 7 lines exceeds the max of 6
     let mut v = valid_minimal();
     v.extend_from_slice(b"extra: x\n");
+    v.extend_from_slice(b"extra2: y\n");
     assert_parse_fails(&v, "too many lines");
 }
 
@@ -70,6 +81,13 @@ fn test_null_byte() {
 fn test_wrong_key_order() {
     let data = b"hash: sha256:abc\norigin: v1\ntime: 0\nkey: x\nsig: x\n";
     assert_parse_fails(data, "wrong key order");
+}
+
+#[test]
+fn test_wrong_key_order_with_parent() {
+    // 6 lines but second key is not 'parent'
+    let data = b"origin: v1\nhash: sha256:abc\ntime: 0\nkey: x\nsig: x\nextra: x\n";
+    assert_parse_fails(data, "wrong key order with parent");
 }
 
 #[test]
@@ -125,6 +143,27 @@ fn test_hash_too_short() {
         "abc",
     );
     assert_parse_fails(tampered.as_bytes(), "hash too short");
+}
+
+#[test]
+fn test_hash_alg_sha384() {
+    // Valid sha384 hash (96 hex chars)
+    let data = b"origin: v1\nhash: sha384:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n";
+    assert_parse_ok(data, "sha384 hash");
+}
+
+#[test]
+fn test_hash_alg_sha512() {
+    // Valid sha512 hash (128 hex chars)
+    let hex128 = "a".repeat(128);
+    let data = format!("origin: v1\nhash: sha512:{}\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n", hex128);
+    assert_parse_ok(data.as_bytes(), "sha512 hash");
+}
+
+#[test]
+fn test_hash_alg_unknown() {
+    let data = b"origin: v1\nhash: md5:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ntime: 0\nkey: xxxxx\nsig: xxxxx\n";
+    assert_parse_fails(data, "unknown hash algorithm");
 }
 
 #[test]
@@ -188,7 +227,6 @@ fn test_key_invalid_base64url() {
 fn test_key_decoded_length_mismatch() {
     let v = valid_minimal();
     let text = String::from_utf8(v).unwrap();
-    // 44 valid URL-safe base64 chars WITHOUT padding decodes to 33 bytes, not 32
     let unpadded_44 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     assert_eq!(unpadded_44.len(), 44, "test input must be 44 chars");
     let tampered = text.replace(

@@ -5,7 +5,7 @@ fn make_test_statement() -> (Vec<u8>, Vec<u8>) {
     let secret = SecretKey::from_bytes(&seed).unwrap();
     let data = b"tamper test artifact";
     let ts = 1717776000;
-    let stmt = build_statement(&secret, data, ts).unwrap();
+    let stmt = build_statement(&secret, data, ts, None).unwrap();
     let encoded = encode_statement(&stmt);
     (encoded, data.to_vec())
 }
@@ -28,21 +28,20 @@ fn test_tamper_hash() {
 fn test_tamper_signature() {
     let (stmt, art) = make_test_statement();
     let text = String::from_utf8(stmt).unwrap();
-    // Replace last character of signature
     let tampered = text.trim_end_matches('\n');
     let tampered = tampered.strip_suffix('=').unwrap_or(tampered).to_owned() + "A\n";
     let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
     assert!(result.is_err(), "tampered signature must fail verification");
 }
 
-/// Tamper with the timestamp — must fail verification.
+/// Tamper with the timestamp — now advisory, does NOT break verification.
 #[test]
-fn test_tamper_timestamp() {
+fn test_tamper_timestamp_advisory() {
     let (stmt, art) = make_test_statement();
     let text = String::from_utf8(stmt).unwrap();
     let tampered = text.replace("time: 1717776000", "time: 1717776001");
     let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
-    assert!(result.is_err(), "tampered timestamp must fail verification");
+    assert!(result.is_ok(), "timestamp is advisory — changing it must NOT break verification");
 }
 
 /// Tamper with the public key — must fail verification.
@@ -82,11 +81,10 @@ fn test_wrong_artifact() {
 fn test_empty_artifact() {
     let seed = [1u8; 32];
     let secret = SecretKey::from_bytes(&seed).unwrap();
-    let stmt = build_statement(&secret, b"", 0).unwrap();
+    let stmt = build_statement(&secret, b"", 0, None).unwrap();
     let enc = encode_statement(&stmt);
     let result = origin_core::verify_bytes(&enc, b"");
     assert!(result.is_ok(), "empty artifact must verify correctly");
-    // Wrong data with same hash impossible — only empty matches empty
     let result2 = origin_core::verify_bytes(&enc, b"x");
     assert!(result2.is_err(), "non-empty artifact must fail against empty-artifact statement");
 }
@@ -97,7 +95,7 @@ fn test_reordered_lines() {
     let (stmt, art) = make_test_statement();
     let text = String::from_utf8(stmt).unwrap();
     let mut lines: Vec<&str> = text.lines().collect();
-    lines.swap(0, 1); // swap origin and hash
+    lines.swap(0, 1);
     let tampered = lines.join("\n") + "\n";
     let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
     assert!(result.is_err(), "reordered lines must fail");

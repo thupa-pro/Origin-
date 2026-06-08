@@ -36,6 +36,9 @@ enum Commands {
         /// Unix timestamp (default: current time)
         #[arg(long)]
         time: Option<u64>,
+        /// Path to a parent statement to chain from
+        #[arg(long)]
+        parent: Option<PathBuf>,
     },
     /// Verify a provenance statement against an artifact
     Verify {
@@ -52,23 +55,19 @@ enum Commands {
 }
 
 fn load_secret_key(key_arg: &Option<String>) -> Result<SecretKey, String> {
-    // Try env var first
     if let Ok(env_key) = std::env::var("ORIGIN_KEY") {
         let trimmed = env_key.trim().to_string();
         return decode_secret_key(&trimmed);
     }
 
-    // Try argument
     if let Some(key_src) = key_arg {
         if key_src == "-" {
-            // Read from stdin
             let mut input = String::new();
             std::io::stdin()
                 .read_line(&mut input)
                 .map_err(|e| format!("failed to read key from stdin: {}", e))?;
             return decode_secret_key(input.trim());
         }
-        // Read from file
         let data = std::fs::read_to_string(key_src)
             .map_err(|e| format!("failed to read key file '{}': {}", key_src, e))?;
         return decode_secret_key(data.trim());
@@ -108,7 +107,6 @@ fn main() {
             let secret_b64 = base64_encode(&pair.secret.0);
             let public_b64 = base64_encode(&pair.public.0);
 
-            // Ensure directory exists
             std::fs::create_dir_all(&dir).unwrap_or_else(|e| {
                 eprintln!("error: cannot create output directory: {}", e);
                 std::process::exit(1);
@@ -126,7 +124,6 @@ fn main() {
                 std::process::exit(1);
             });
 
-            // Restrict permissions on secret key (Unix only)
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
@@ -139,7 +136,7 @@ fn main() {
             println!("  Public: {}", pub_path.display());
             println!("  Public key: {}", public_b64);
         }
-        Commands::Sign { path, key, time } => {
+        Commands::Sign { path, key, time, parent } => {
             let secret = match load_secret_key(&key) {
                 Ok(k) => k,
                 Err(e) => {
@@ -156,8 +153,28 @@ fn main() {
                 }
             };
 
+            let parent_hash = if let Some(parent_path) = &parent {
+                let parent_data = match std::fs::read(parent_path) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("error: cannot read parent '{}': {}", parent_path.display(), e);
+                        std::process::exit(1);
+                    }
+                };
+                let parent_stmt = match Statement::parse(&parent_data) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("error: invalid parent statement: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                Some(parent_stmt.hash)
+            } else {
+                None
+            };
+
             let ts = time.unwrap_or_else(current_timestamp);
-            let stmt = match build_statement(&secret, &artifact_data, ts) {
+            let stmt = match build_statement(&secret, &artifact_data, ts, parent_hash.as_deref()) {
                 Ok(s) => s,
                 Err(e) => {
                     eprintln!("error: {}", e);
@@ -166,7 +183,6 @@ fn main() {
             };
 
             let encoded = encode_statement(&stmt);
-            // Write to stdout or to a file
             let stmt_path = path.with_extension("origin");
             match std::fs::write(&stmt_path, &encoded) {
                 Ok(_) => {

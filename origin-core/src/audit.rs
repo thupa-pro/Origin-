@@ -1,15 +1,11 @@
-use crate::error::Result;
 use crate::statement::Statement;
 
 fn timestamp_to_iso8601(ts: u64) -> String {
-    // Compute ISO 8601 from unix timestamp
     let secs_per_day: u64 = 86400;
     let days = ts / secs_per_day;
     let day_secs = ts % secs_per_day;
 
-    // Rata die days since 1970-01-01
-    let rata_die = days as i64 + 719468; // days since 0000-03-01
-
+    let rata_die = days as i64 + 719468;
     let era = if rata_die >= 0 { rata_die } else { rata_die - 146096 } / 146097;
     let doe = rata_die - era * 146097;
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
@@ -32,15 +28,22 @@ fn timestamp_to_iso8601(ts: u64) -> String {
 
 pub fn audit(statement: &Statement) -> String {
     let iso = timestamp_to_iso8601(statement.time);
+    let parent_line = if let Some(ref p) = statement.parent {
+        format!("├─ Parent:  {}\n", p)
+    } else {
+        String::new()
+    };
     format!(
         "Statement Audit\n\
          ├─ Origin:  {}\n\
-         ├─ Hash:    {}\n\
-         ├─ Time:    {} ({})\n\
+         {}├─ Hash:    {} ({})\n\
+         ├─ Time:    {} ({}) — advisory\n\
          ├─ Key:     {}\n\
          └─ Sig:     {}",
         statement.origin,
+        parent_line,
         statement.hash,
+        statement.hash_alg,
         iso,
         statement.time,
         statement.key_b64,
@@ -48,10 +51,10 @@ pub fn audit(statement: &Statement) -> String {
     )
 }
 
-pub fn audit_with_verdict(statement: &Statement, verify_result: &Result<()>) -> String {
+pub fn audit_with_verdict(statement: &Statement, verify_result: &crate::error::Result<()>) -> String {
     let verdict = match verify_result {
-        Ok(()) => "VERIFIED",
-        Err(e) => &format!("FAILED: {}", e),
+        Ok(()) => "VERIFIED".to_string(),
+        Err(e) => format!("FAILED: {}", e),
     };
     format!("{}\n  Verdict: {}", audit(statement), verdict)
 }
