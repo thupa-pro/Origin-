@@ -9,18 +9,57 @@ const SIG_B64_LEN: usize = 88;
 const HEX_CHARS: &[u8] = b"0123456789abcdef";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StatementType {
+    Provenance,
+    Revocation,
+}
+
+impl StatementType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            StatementType::Provenance => "provenance",
+            StatementType::Revocation => "revocation",
+        }
+    }
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "provenance" => Ok(StatementType::Provenance),
+            "revocation" => Ok(StatementType::Revocation),
+            other => Err(Error::Format(format!(
+                "unknown statement type '{}'. Allowed: provenance, revocation",
+                other
+            ))),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StatementBody {
+    Provenance {
+        hash: String,
+        hash_hex: String,
+        hash_alg: HashAlgorithm,
+        hash_bytes: Vec<u8>,
+        time: u64,
+    },
+    Revocation {
+        revoked_key_b64: String,
+        revoked_key_bytes: [u8; 32],
+        revoked_since: u64,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Statement {
+    pub type_: StatementType,
     pub origin: String,
-    pub parent: Option<String>,
-    pub hash: String,
-    pub hash_hex: String,
-    pub hash_alg: HashAlgorithm,
-    pub hash_bytes: Vec<u8>,
-    pub time: u64,
+    pub body: StatementBody,
     pub key_b64: String,
     pub key_bytes: [u8; 32],
     pub sig_b64: String,
     pub sig_bytes: [u8; 64],
+    pub parent: Option<String>,
     raw_lines: Vec<String>,
     parent_present: bool,
 }
@@ -106,6 +145,25 @@ fn validate_base64url(s: &str, expected_encoded: usize, expected_bytes: usize) -
     Ok(bytes)
 }
 
+fn validate_timestamp(value: &str) -> Result<u64> {
+    if !value.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(Error::Format("timestamp must be ASCII digits".into()));
+    }
+    if value.len() > 1 && value.starts_with('0') {
+        return Err(Error::Format("timestamp must not have leading zeros".into()));
+    }
+    let ts: u64 = value
+        .parse()
+        .map_err(|_| Error::Format("timestamp overflow".into()))?;
+    if ts > MAX_TIMESTAMP {
+        return Err(Error::Format(format!(
+            "timestamp {} exceeds maximum {}",
+            ts, MAX_TIMESTAMP
+        )));
+    }
+    Ok(ts)
+}
+
 impl Statement {
     pub fn parse(data: &[u8]) -> Result<Self> {
         let text = std::str::from_utf8(data)
@@ -127,9 +185,9 @@ impl Statement {
         let raw = text.strip_suffix('\n').unwrap_or(text);
         let lines: Vec<&str> = raw.split('\n').collect();
 
-        if lines.len() < 5 || lines.len() > 6 {
+        if lines.len() < 6 || lines.len() > 7 {
             return Err(Error::Format(format!(
-                "expected 5 or 6 lines, got {}",
+                "expected 6 or 7 lines, got {}",
                 lines.len()
             )));
         }
@@ -139,14 +197,6 @@ impl Statement {
                 return Err(Error::Format(format!("line {} is empty", i + 1)));
             }
         }
-
-        // Determine expected key order
-        let has_parent = lines.len() == 6;
-        let expected_order: Vec<&str> = if has_parent {
-            vec!["origin", "parent", "hash", "time", "key", "sig"]
-        } else {
-            vec!["origin", "hash", "time", "key", "sig"]
-        };
 
         let mut fields: Vec<(&str, &str)> = Vec::with_capacity(lines.len());
         let mut seen_keys = std::collections::HashSet::new();
@@ -189,12 +239,6 @@ impl Statement {
                 }
             }
 
-            if *key != *expected_order[i] {
-                return Err(Error::Format(format!(
-                    "line {}: expected key '{}', got '{}'",
-                    i + 1, expected_order[i], key
-                )));
-            }
             if !seen_keys.insert(key) {
                 return Err(Error::Format(format!("duplicate key '{}'", key)));
             }
@@ -202,6 +246,7 @@ impl Statement {
             fields.push((key, value));
         }
 
+        // Validate origin (always line 1)
         let origin_val = fields[0].1;
         if origin_val != PROTOCOL_VERSION {
             return Err(Error::Format(format!(
@@ -210,133 +255,187 @@ impl Statement {
             )));
         }
 
-        // Extract parent if present
-        let parent_val;
-        let hash_val;
-        let time_val;
-        let key_val;
-        let sig_val;
-
-        if has_parent {
-            parent_val = Some(fields[1].1.to_string());
-            hash_val = fields[2].1;
-            time_val = fields[3].1;
-            key_val = fields[4].1;
-            sig_val = fields[5].1;
-        } else {
-            parent_val = None;
-            hash_val = fields[1].1;
-            time_val = fields[2].1;
-            key_val = fields[3].1;
-            sig_val = fields[4].1;
-        }
-
-        // Validate parent hash if present
-        if let Some(ref p) = parent_val {
-            parse_hash_string(p)?;
-        }
-
-        // Validate artifact hash
-        let (hash_alg, hash_hex_str, hash_bytes) = parse_hash_string(hash_val)?;
-
-        // Validate timestamp (advisory — not in canonical body)
-        if !time_val.bytes().all(|b| b.is_ascii_digit()) {
-            return Err(Error::Format("timestamp must be ASCII digits".into()));
-        }
-        if time_val.len() > 1 && time_val.starts_with('0') {
-            return Err(Error::Format("timestamp must not have leading zeros".into()));
-        }
-        let time: u64 = time_val
-            .parse()
-            .map_err(|_| Error::Format("timestamp overflow".into()))?;
-        if time > MAX_TIMESTAMP {
+        // Validate type (always line 2)
+        if fields[1].0 != "type" {
             return Err(Error::Format(format!(
-                "timestamp {} exceeds maximum {}",
-                time, MAX_TIMESTAMP
+                "line 2: expected key 'type', got '{}'",
+                fields[1].0
             )));
         }
+        let type_val = StatementType::from_str(fields[1].1)?;
 
-        // Validate key
-        let key_raw = validate_base64url(key_val, KEY_B64_LEN, 32)?;
+        match type_val {
+            StatementType::Provenance => Self::parse_provenance(fields, lines, origin_val),
+            StatementType::Revocation => Self::parse_revocation(fields, lines, origin_val),
+        }
+    }
+
+    fn parse_provenance(
+        fields: Vec<(&str, &str)>,
+        lines: Vec<&str>,
+        origin_val: &str,
+    ) -> Result<Self> {
+        let has_parent = fields.len() == 7;
+        let expected_keys: Vec<&str> = if has_parent {
+            vec!["origin", "type", "parent", "hash", "time", "key", "sig"]
+        } else {
+            vec!["origin", "type", "hash", "time", "key", "sig"]
+        };
+
+        for (i, (key, _)) in fields.iter().enumerate() {
+            if *key != expected_keys[i] {
+                return Err(Error::Format(format!(
+                    "line {}: expected key '{}', got '{}'",
+                    i + 1, expected_keys[i], key
+                )));
+            }
+        }
+
+        let parent_val = if has_parent {
+            let p = fields[2].1.to_string();
+            parse_hash_string(&p)?;
+            Some(p)
+        } else {
+            None
+        };
+
+        let hash_line_idx = if has_parent { 3 } else { 2 };
+        let time_idx = if has_parent { 4 } else { 3 };
+        let key_idx = if has_parent { 5 } else { 4 };
+        let sig_idx = if has_parent { 6 } else { 5 };
+
+        let (hash_alg, hash_hex_str, hash_bytes) = parse_hash_string(fields[hash_line_idx].1)?;
+        let hash_val = fields[hash_line_idx].1.to_string();
+
+        let time = validate_timestamp(fields[time_idx].1)?;
+
+        let key_raw = validate_base64url(fields[key_idx].1, KEY_B64_LEN, 32)?;
         let mut key_bytes = [0u8; 32];
         key_bytes.copy_from_slice(&key_raw);
 
-        // Validate signature
-        let sig_raw = validate_base64url(sig_val, SIG_B64_LEN, 64)?;
+        let sig_raw = validate_base64url(fields[sig_idx].1, SIG_B64_LEN, 64)?;
         let mut sig_bytes = [0u8; 64];
         sig_bytes.copy_from_slice(&sig_raw);
 
         let raw_lines: Vec<String> = lines.iter().map(|s| (*s).to_string()).collect();
 
         Ok(Statement {
+            type_: StatementType::Provenance,
             origin: origin_val.to_string(),
-            parent: parent_val,
-            hash: hash_val.to_string(),
-            hash_hex: hash_hex_str,
-            hash_alg,
-            hash_bytes,
-            time,
-            key_b64: key_val.to_string(),
+            body: StatementBody::Provenance {
+                hash: hash_val,
+                hash_hex: hash_hex_str,
+                hash_alg,
+                hash_bytes,
+                time,
+            },
+            key_b64: fields[key_idx].1.to_string(),
             key_bytes,
-            sig_b64: sig_val.to_string(),
+            sig_b64: fields[sig_idx].1.to_string(),
             sig_bytes,
+            parent: parent_val,
             raw_lines,
             parent_present: has_parent,
         })
     }
 
+    fn parse_revocation(
+        fields: Vec<(&str, &str)>,
+        lines: Vec<&str>,
+        origin_val: &str,
+    ) -> Result<Self> {
+        let expected_keys = vec!["origin", "type", "revoked", "since", "key", "sig"];
+
+        if fields.len() != 6 {
+            return Err(Error::Format(format!(
+                "revocation statement: expected 6 lines, got {}",
+                fields.len()
+            )));
+        }
+
+        for (i, (key, _)) in fields.iter().enumerate() {
+            if *key != expected_keys[i] {
+                return Err(Error::Format(format!(
+                    "line {}: expected key '{}', got '{}'",
+                    i + 1, expected_keys[i], key
+                )));
+            }
+        }
+
+        let revoked_key_val = fields[2].1;
+        let key_raw = validate_base64url(revoked_key_val, KEY_B64_LEN, 32)?;
+        let mut revoked_key_bytes = [0u8; 32];
+        revoked_key_bytes.copy_from_slice(&key_raw);
+
+        let since = validate_timestamp(fields[3].1)?;
+
+        let key_val = fields[4].1;
+        let key_raw2 = validate_base64url(key_val, KEY_B64_LEN, 32)?;
+        let mut key_bytes = [0u8; 32];
+        key_bytes.copy_from_slice(&key_raw2);
+
+        let sig_raw = validate_base64url(fields[5].1, SIG_B64_LEN, 64)?;
+        let mut sig_bytes = [0u8; 64];
+        sig_bytes.copy_from_slice(&sig_raw);
+
+        let raw_lines: Vec<String> = lines.iter().map(|s| (*s).to_string()).collect();
+
+        Ok(Statement {
+            type_: StatementType::Revocation,
+            origin: origin_val.to_string(),
+            body: StatementBody::Revocation {
+                revoked_key_b64: revoked_key_val.to_string(),
+                revoked_key_bytes,
+                revoked_since: since,
+            },
+            key_b64: key_val.to_string(),
+            key_bytes,
+            sig_b64: fields[5].1.to_string(),
+            sig_bytes,
+            parent: None,
+            raw_lines,
+            parent_present: false,
+        })
+    }
+
     pub fn canonical_body(&self) -> Vec<u8> {
-        let raw0 = &self.raw_lines[0];
+        match self.type_ {
+            StatementType::Provenance => self.canonical_provenance(),
+            StatementType::Revocation => self.canonical_revocation(),
+        }
+    }
 
+    fn canonical_provenance(&self) -> Vec<u8> {
+        // raw_lines: [origin, type, (parent), hash, time, key, sig]
+        // Canonical: origin, type, (parent), hash, key
         if self.parent_present {
-            let raw1 = &self.raw_lines[1];
-            let raw2 = &self.raw_lines[2];
-            let key_line = &self.raw_lines[4];
-            // ^ In the raw_lines array: with parent, key is at index 4; without, at index 3
-
-            // Actually, let me be more careful. The raw_lines stores all lines as parsed.
-            // For canonical body, we need:
-            // origin: v1
-            // parent: ... (if present)
-            // hash: ...
-            // key: ...
-            // (no time, no sig)
-
-            // The raw_lines content for has_parent=true:
-            // [0]: origin: v1
-            // [1]: parent: sha256:...
-            // [2]: hash: sha256:...
-            // [3]: time: ...
-            // [4]: key: ...
-            // [5]: sig: ...
-
-            // Canonical body: lines 0, 1, 2, 4 (origin, parent, hash, key)
-            // with \n between, no trailing \n
-
             let mut body = String::new();
-            body.push_str(raw0); body.push('\n');
-            body.push_str(raw1); body.push('\n');
-            body.push_str(raw2); body.push('\n');
-            body.push_str(key_line);
+            body.push_str(&self.raw_lines[0]); body.push('\n');
+            body.push_str(&self.raw_lines[1]); body.push('\n');
+            body.push_str(&self.raw_lines[2]); body.push('\n');
+            body.push_str(&self.raw_lines[3]); body.push('\n');
+            body.push_str(&self.raw_lines[5]);
             body.into_bytes()
         } else {
-            // Without parent:
-            // [0]: origin: v1
-            // [1]: hash: ...
-            // [2]: time: ...
-            // [3]: key: ...
-            // [4]: sig: ...
-
-            // Canonical body: lines 0, 1, 3 (origin, hash, key)
-            let raw1 = &self.raw_lines[1];
-            let key_line = &self.raw_lines[3];
-
             let mut body = String::new();
-            body.push_str(raw0); body.push('\n');
-            body.push_str(raw1); body.push('\n');
-            body.push_str(key_line);
+            body.push_str(&self.raw_lines[0]); body.push('\n');
+            body.push_str(&self.raw_lines[1]); body.push('\n');
+            body.push_str(&self.raw_lines[2]); body.push('\n');
+            body.push_str(&self.raw_lines[4]);
             body.into_bytes()
         }
+    }
+
+    fn canonical_revocation(&self) -> Vec<u8> {
+        // raw_lines: [origin, type, revoked, since, key, sig]
+        // Canonical: origin, type, revoked, since, key
+        let mut body = String::new();
+        body.push_str(&self.raw_lines[0]); body.push('\n');
+        body.push_str(&self.raw_lines[1]); body.push('\n');
+        body.push_str(&self.raw_lines[2]); body.push('\n');
+        body.push_str(&self.raw_lines[3]); body.push('\n');
+        body.push_str(&self.raw_lines[4]);
+        body.into_bytes()
     }
 
     pub fn has_parent(&self) -> bool {
@@ -345,6 +444,49 @@ impl Statement {
 
     pub fn parent_hash_hex(&self) -> Option<&str> {
         self.parent.as_deref()
+    }
+
+    // Convenience accessors for provenance body fields
+    pub fn hash_str(&self) -> Option<&str> {
+        match &self.body {
+            StatementBody::Provenance { hash, .. } => Some(hash),
+            _ => None,
+        }
+    }
+
+    pub fn hash_hex(&self) -> Option<&str> {
+        match &self.body {
+            StatementBody::Provenance { hash_hex, .. } => Some(hash_hex),
+            _ => None,
+        }
+    }
+
+    pub fn hash_alg(&self) -> Option<&HashAlgorithm> {
+        match &self.body {
+            StatementBody::Provenance { hash_alg, .. } => Some(hash_alg),
+            _ => None,
+        }
+    }
+
+    pub fn time(&self) -> Option<u64> {
+        match &self.body {
+            StatementBody::Provenance { time, .. } => Some(*time),
+            _ => None,
+        }
+    }
+
+    pub fn revoked_key_b64(&self) -> Option<&str> {
+        match &self.body {
+            StatementBody::Revocation { revoked_key_b64, .. } => Some(revoked_key_b64),
+            _ => None,
+        }
+    }
+
+    pub fn revoked_since(&self) -> Option<u64> {
+        match &self.body {
+            StatementBody::Revocation { revoked_since, .. } => Some(*revoked_since),
+            _ => None,
+        }
     }
 }
 
@@ -361,21 +503,21 @@ pub fn build_statement(
     let public_b64 = crate::base64_encode(pair.public.as_bytes());
 
     let origin_line = format!("origin: {}", PROTOCOL_VERSION);
+    let type_line = "type: provenance".to_string();
     let hash_line = format!("hash: {}", hash_str);
     let time_line = format!("time: {}", timestamp);
     let key_line = format!("key: {}", public_b64);
 
-    // Build canonical body (time excluded, parent included if present)
     let canonical = if let Some(p) = parent_hash {
         let parent_line = format!("parent: {}", p);
         format!(
-            "{}\n{}\n{}\n{}",
-            origin_line, parent_line, hash_line, key_line
+            "{}\n{}\n{}\n{}\n{}",
+            origin_line, type_line, parent_line, hash_line, key_line
         )
     } else {
         format!(
-            "{}\n{}\n{}",
-            origin_line, hash_line, key_line
+            "{}\n{}\n{}\n{}",
+            origin_line, type_line, hash_line, key_line
         )
     };
 
@@ -386,6 +528,7 @@ pub fn build_statement(
         let parent_line = format!("parent: {}", p);
         vec![
             origin_line,
+            type_line,
             parent_line,
             hash_line,
             time_line,
@@ -395,6 +538,7 @@ pub fn build_statement(
     } else {
         vec![
             origin_line,
+            type_line,
             hash_line,
             time_line,
             key_line,
@@ -403,52 +547,131 @@ pub fn build_statement(
     };
 
     Ok(Statement {
+        type_: StatementType::Provenance,
         origin: PROTOCOL_VERSION.to_string(),
-        parent: parent_hash.map(|s| s.to_string()),
-        hash: hash_str,
-        hash_hex: hash_hex_str,
-        hash_alg: HashAlgorithm::Sha256,
-        hash_bytes: hash_bytes_vec,
-        time: timestamp,
+        body: StatementBody::Provenance {
+            hash: hash_str,
+            hash_hex: hash_hex_str,
+            hash_alg: HashAlgorithm::Sha256,
+            hash_bytes: hash_bytes_vec,
+            time: timestamp,
+        },
         key_b64: public_b64,
         key_bytes: pair.public.0,
         sig_b64,
         sig_bytes: sig.0,
+        parent: parent_hash.map(|s| s.to_string()),
         raw_lines,
         parent_present: parent_hash.is_some(),
     })
 }
 
+pub fn build_revocation_statement(
+    secret: &crypto::SecretKey,
+    revoked_public_key_b64: &str,
+    since: u64,
+    signer_public_key_b64: &str,
+) -> Result<Statement> {
+    // Validate inputs
+    validate_base64url(revoked_public_key_b64, KEY_B64_LEN, 32)?;
+    validate_base64url(signer_public_key_b64, KEY_B64_LEN, 32)?;
+
+    let origin_line = format!("origin: {}", PROTOCOL_VERSION);
+    let type_line = "type: revocation".to_string();
+    let revoked_line = format!("revoked: {}", revoked_public_key_b64);
+    let since_line = format!("since: {}", since);
+    let key_line = format!("key: {}", signer_public_key_b64);
+
+    let canonical = format!(
+        "{}\n{}\n{}\n{}\n{}",
+        origin_line, type_line, revoked_line, since_line, key_line
+    );
+
+    let sig = crypto::sign(secret, canonical.as_bytes());
+    let sig_b64 = crate::base64_encode(&sig.0);
+
+    let revoked_key_bytes_val = {
+        let raw = crate::base64_decode(revoked_public_key_b64)
+            .map_err(|_| Error::Format("invalid base64 in revoked key".into()))?;
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&raw);
+        arr
+    };
+
+    let raw_lines = vec![
+        origin_line,
+        type_line,
+        revoked_line,
+        since_line,
+        key_line,
+        format!("sig: {}", sig_b64),
+    ];
+
+    Ok(Statement {
+        type_: StatementType::Revocation,
+        origin: PROTOCOL_VERSION.to_string(),
+        body: StatementBody::Revocation {
+            revoked_key_b64: revoked_public_key_b64.to_string(),
+            revoked_key_bytes: revoked_key_bytes_val,
+            revoked_since: since,
+        },
+        key_b64: signer_public_key_b64.to_string(),
+        key_bytes: {
+            let raw = crate::base64_decode(signer_public_key_b64)
+                .map_err(|_| Error::Format("invalid base64 in key".into()))?;
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&raw);
+            arr
+        },
+        sig_b64,
+        sig_bytes: sig.0,
+        parent: None,
+        raw_lines,
+        parent_present: false,
+    })
+}
+
 pub fn encode_statement(stmt: &Statement) -> Vec<u8> {
     let mut result = String::new();
-    result.push_str(&stmt.raw_lines[0]); result.push('\n');
-    if stmt.parent_present {
-        result.push_str(&stmt.raw_lines[1]); result.push('\n');
-        // raw_lines[2] is hash, [3] is time, [4] is key, [5] is sig
-        result.push_str(&stmt.raw_lines[2]); result.push('\n');
-        result.push_str(&stmt.raw_lines[3]); result.push('\n');
-        result.push_str(&stmt.raw_lines[4]); result.push('\n');
-        result.push_str(&stmt.raw_lines[5]); result.push('\n');
-    } else {
-        result.push_str(&stmt.raw_lines[1]); result.push('\n');
-        result.push_str(&stmt.raw_lines[2]); result.push('\n');
-        result.push_str(&stmt.raw_lines[3]); result.push('\n');
-        result.push_str(&stmt.raw_lines[4]); result.push('\n');
+    for line in &stmt.raw_lines {
+        result.push_str(line);
+        result.push('\n');
     }
     result.into_bytes()
 }
 
 pub fn verify_statement(stmt: &Statement, artifact_bytes: &[u8]) -> Result<()> {
-    let (actual_hash_hex, _) = hash::hash_data(artifact_bytes, &stmt.hash_alg);
-    if actual_hash_hex != stmt.hash_hex {
-        return Err(Error::HashMismatch {
-            expected: stmt.hash_hex.clone(),
-            actual: actual_hash_hex,
-        });
-    }
+    match &stmt.body {
+        StatementBody::Provenance { hash_hex, hash_alg, .. } => {
+            let (actual_hash_hex, _) = hash::hash_data(artifact_bytes, hash_alg);
+            if actual_hash_hex != *hash_hex {
+                return Err(Error::HashMismatch {
+                    expected: hash_hex.clone(),
+                    actual: actual_hash_hex,
+                });
+            }
 
-    let public_key = crypto::PublicKey::from_bytes(&stmt.key_bytes)?;
-    let canonical = stmt.canonical_body();
-    let sig = crypto::Signature::from_bytes(&stmt.sig_bytes)?;
-    crypto::verify(&public_key, &canonical, &sig)
+            let public_key = crypto::PublicKey::from_bytes(&stmt.key_bytes)?;
+            let canonical = stmt.canonical_body();
+            let sig = crypto::Signature::from_bytes(&stmt.sig_bytes)?;
+            crypto::verify(&public_key, &canonical, &sig)
+        }
+        StatementBody::Revocation { .. } => {
+            Err(Error::Format("cannot verify a revocation statement against an artifact".into()))
+        }
+    }
+}
+
+pub fn verify_revocation(stmt: &Statement) -> Result<()> {
+    match &stmt.body {
+        StatementBody::Revocation { .. } => {
+            let public_key = crypto::PublicKey::from_bytes(&stmt.key_bytes)?;
+            let canonical = stmt.canonical_body();
+            let sig = crypto::Signature::from_bytes(&stmt.sig_bytes)?;
+            crypto::verify(&public_key, &canonical, &sig)
+        }
+        StatementBody::Provenance { .. } => {
+            Err(Error::Format("statement is not a revocation".into()))
+        }
+    }
 }

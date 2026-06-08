@@ -10,6 +10,17 @@ fn make_test_statement() -> (Vec<u8>, Vec<u8>) {
     (encoded, data.to_vec())
 }
 
+fn make_test_statement_with_parent() -> (Vec<u8>, Vec<u8>) {
+    let seed = [42u8; 32];
+    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let data = b"tamper test artifact";
+    let ts = 1717776000;
+    let stmt = build_statement(&secret, data, ts,
+        Some("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")).unwrap();
+    let encoded = encode_statement(&stmt);
+    (encoded, data.to_vec())
+}
+
 /// Tamper with the hash line — must fail verification.
 #[test]
 fn test_tamper_hash() {
@@ -50,7 +61,7 @@ fn test_tamper_pubkey() {
     let (stmt, art) = make_test_statement();
     let text = String::from_utf8(stmt).unwrap();
     let tampered = text.replace(
-        &text.lines().nth(3).unwrap()[..10],
+        &text.lines().nth(4).unwrap()[..10],
         "AAAAAAAAAA",
     );
     let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
@@ -65,6 +76,16 @@ fn test_tamper_origin() {
     let tampered = text.replace("origin: v1", "origin: v2");
     let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
     assert!(result.is_err(), "tampered origin must fail verification");
+}
+
+/// Tamper with the type field — must fail verification.
+#[test]
+fn test_tamper_type() {
+    let (stmt, art) = make_test_statement();
+    let text = String::from_utf8(stmt).unwrap();
+    let tampered = text.replace("type: provenance", "type: provenance2");
+    let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
+    assert!(result.is_err(), "tampered type must fail verification");
 }
 
 /// Completely replace the artifact — must fail verification.
@@ -109,4 +130,17 @@ fn test_trailing_content() {
     let tampered = text.trim_end_matches('\n').to_string() + "\nextra: garbage\n";
     let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
     assert!(result.is_err(), "extra lines must fail");
+}
+
+/// Tamper with parent hash in a parent-linked statement.
+#[test]
+fn test_tamper_parent_hash() {
+    let (stmt, art) = make_test_statement_with_parent();
+    let text = String::from_utf8(stmt).unwrap();
+    let tampered = text.replace(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    );
+    let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
+    assert!(result.is_err(), "tampered parent hash must fail verification");
 }

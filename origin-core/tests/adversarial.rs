@@ -1,11 +1,13 @@
-use origin_core::{base64_encode, build_statement, verify_bytes, SecretKey, Statement};
+use origin_core::{
+    base64_encode, build_revocation_statement, build_statement, encode_statement, verify_bytes,
+    verify_revocation, Statement,
+};
 
 /// Timestamp is now advisory — changing it does NOT break verification.
-/// This test verifies that behavior is correct and documented.
 #[test]
 fn test_timestamp_advisory() {
     let seed = [99u8; 32];
-    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
     let data = b"important artifact v1.0";
     let original_ts = 1717776000;
 
@@ -14,7 +16,6 @@ fn test_timestamp_advisory() {
 
     assert!(verify_bytes(&encoded, data).is_ok(), "original must verify");
 
-    // Timestamp change must NOT break verification (advisory field)
     let text = String::from_utf8(encoded).unwrap();
     let tampered = text.replace("time: 1717776000", "time: 1717776001");
     let result = verify_bytes(tampered.as_bytes(), data);
@@ -25,14 +26,13 @@ fn test_timestamp_advisory() {
 #[test]
 fn test_origin_replay_attack() {
     let seed = [99u8; 32];
-    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
     let data = b"test";
     let stmt = build_statement(&secret, data, 100, None).unwrap();
     let encoded = origin_core::encode_statement(&stmt);
     let text = String::from_utf8(encoded).unwrap();
     let tampered = text.replace("origin: v1", "origin: v2");
 
-    // v2 fails both parse (strict) and verify (canonical body changed)
     let result = verify_bytes(tampered.as_bytes(), data);
     assert!(result.is_err(), "origin change must fail");
 }
@@ -41,7 +41,7 @@ fn test_origin_replay_attack() {
 #[test]
 fn test_artifact_replay_attack() {
     let seed = [99u8; 32];
-    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
     let data1 = b"version 1.0";
     let data2 = b"version 2.0 (malicious)";
 
@@ -56,7 +56,7 @@ fn test_artifact_replay_attack() {
 #[test]
 fn test_malformed_statement_preserving_sig() {
     let seed = [1u8; 32];
-    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
     let data = b"artifact";
     let stmt = build_statement(&secret, data, 100, None).unwrap();
     let encoded = origin_core::encode_statement(&stmt);
@@ -69,6 +69,7 @@ fn test_malformed_statement_preserving_sig() {
             "hash: ",
             "hash: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         ),
+        text.replace("type: provenance", "type: revocation"),
     ];
 
     for tampered in attacks {
@@ -82,7 +83,7 @@ fn test_malformed_statement_preserving_sig() {
 fn test_pubkey_swap_attack() {
     let seed1 = [1u8; 32];
     let seed2 = [2u8; 32];
-    let secret1 = SecretKey::from_bytes(&seed1).unwrap();
+    let secret1 = origin_core::SecretKey::from_bytes(&seed1).unwrap();
     let data = b"artifact";
 
     let stmt = build_statement(&secret1, data, 100, None).unwrap();
@@ -93,7 +94,7 @@ fn test_pubkey_swap_attack() {
     let pk2_b64 = base64_encode(pair2.public.as_bytes());
 
     let lines: Vec<&str> = text.lines().collect();
-    let old_key_line = lines[3];
+    let old_key_line = lines[4];
     let new_key_line = format!("key: {}", pk2_b64);
     let tampered = text.replace(old_key_line, &new_key_line);
 
@@ -105,7 +106,7 @@ fn test_pubkey_swap_attack() {
 #[test]
 fn test_oversized_statement() {
     let large_key = vec!['A' as u8; 1000];
-    let mut content = b"origin: v1\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: ".to_vec();
+    let mut content = b"origin: v1\ntype: provenance\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: ".to_vec();
     content.extend_from_slice(&large_key);
     content.extend_from_slice(b"\nsig: ");
     content.extend_from_slice(&large_key);
@@ -119,7 +120,7 @@ fn test_oversized_statement() {
 #[test]
 fn test_non_canonical_timestamp() {
     let seed = [5u8; 32];
-    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
     let data = b"artifact";
     let stmt = build_statement(&secret, data, 100, None).unwrap();
     let encoded = origin_core::encode_statement(&stmt);
@@ -141,7 +142,7 @@ fn test_non_canonical_timestamp() {
 #[test]
 fn test_unicode_attack() {
     let seed = [7u8; 32];
-    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
     let data = b"artifact";
     let stmt = build_statement(&secret, data, 100, None).unwrap();
     let encoded = origin_core::encode_statement(&stmt);
@@ -156,21 +157,21 @@ fn test_unicode_attack() {
 #[test]
 fn test_canonical_body_integrity() {
     let seed = [8u8; 32];
-    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
     let data = b"artifact";
 
     let stmt = build_statement(&secret, data, 100, None).unwrap();
     let encoded = origin_core::encode_statement(&stmt);
 
-    // Canonical body is origin + hash + key (no time, no sig)
+    // Canonical body is origin + type + hash + key (no time, no sig)
     let text = String::from_utf8(encoded).unwrap();
     let lines: Vec<&str> = text.lines().collect();
-    let expected_canonical = format!("{}\n{}\n{}", lines[0], lines[1], lines[3]);
+    let expected_canonical = format!("{}\n{}\n{}\n{}", lines[0], lines[1], lines[2], lines[4]);
 
     assert_eq!(
         String::from_utf8(stmt.canonical_body()).unwrap(),
         expected_canonical,
-        "canonical body must be origin, hash, key with no trailing newline"
+        "canonical body must be origin, type, hash, key with no trailing newline"
     );
 }
 
@@ -178,7 +179,7 @@ fn test_canonical_body_integrity() {
 #[test]
 fn test_canonical_body_integrity_with_parent() {
     let seed = [8u8; 32];
-    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
     let data = b"artifact";
 
     let stmt = build_statement(&secret, data, 100,
@@ -187,8 +188,8 @@ fn test_canonical_body_integrity_with_parent() {
 
     let text = String::from_utf8(encoded).unwrap();
     let lines: Vec<&str> = text.lines().collect();
-    // With parent: line order is [origin, parent, hash, time, key, sig]
-    let expected_canonical = format!("{}\n{}\n{}\n{}", lines[0], lines[1], lines[2], lines[4]);
+    // With parent: line order is [origin, type, parent, hash, time, key, sig]
+    let expected_canonical = format!("{}\n{}\n{}\n{}\n{}", lines[0], lines[1], lines[2], lines[3], lines[5]);
 
     assert_eq!(
         String::from_utf8(stmt.canonical_body()).unwrap(),
@@ -197,11 +198,98 @@ fn test_canonical_body_integrity_with_parent() {
     );
 }
 
+/// Parent hash in canonical body — changing parent invalidates sig.
+#[test]
+fn test_parent_tamper_attack() {
+    let seed = [10u8; 32];
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
+    let data = b"child";
+
+    let stmt = build_statement(&secret, data, 100,
+        Some("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")).unwrap();
+    let encoded = origin_core::encode_statement(&stmt);
+
+    let text = String::from_utf8(encoded).unwrap();
+    let tampered = text.replace(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    );
+
+    let result = verify_bytes(tampered.as_bytes(), data);
+    assert!(result.is_err(), "tampered parent must fail verification");
+}
+
+/// Changing type from provenance to something else breaks verification.
+#[test]
+fn test_type_field_tamper() {
+    let seed = [11u8; 32];
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
+    let data = b"artifact";
+    let stmt = build_statement(&secret, data, 100, None).unwrap();
+    let encoded = origin_core::encode_statement(&stmt);
+
+    let text = String::from_utf8(encoded).unwrap();
+    let tampered = text.replace("type: provenance", "type: provenance2");
+
+    let result = verify_bytes(tampered.as_bytes(), data);
+    assert!(result.is_err(), "tampered type must fail");
+}
+
+/// Verify revocation statement build, parse, and signature.
+#[test]
+fn test_revocation_lifecycle() {
+    let seed = [12u8; 32];
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
+    let pair = origin_core::generate_keypair_from_seed(&seed);
+    let pub_b64 = base64_encode(pair.public.as_bytes());
+
+    let rev_stmt = build_revocation_statement(&secret, &pub_b64, 1717776000, &pub_b64).unwrap();
+    assert_eq!(rev_stmt.type_, origin_core::StatementType::Revocation);
+    assert_eq!(rev_stmt.revoked_key_b64(), Some(pub_b64.as_str()));
+    assert_eq!(rev_stmt.revoked_since(), Some(1717776000));
+
+    let encoded = encode_statement(&rev_stmt);
+    let parsed = Statement::parse(&encoded).unwrap();
+    assert_eq!(parsed.type_, origin_core::StatementType::Revocation);
+
+    assert!(verify_revocation(&rev_stmt).is_ok(), "self-issued revocation must verify");
+}
+
+/// Revocation of a different key (key K revokes key R).
+#[test]
+fn test_revocation_different_signer() {
+    let seed_signer = [13u8; 32];
+    let seed_revoked = [14u8; 32];
+    let secret_signer = origin_core::SecretKey::from_bytes(&seed_signer).unwrap();
+    let pair_revoked = origin_core::generate_keypair_from_seed(&seed_revoked);
+    let pair_signer = origin_core::generate_keypair_from_seed(&seed_signer);
+    let revoked_b64 = base64_encode(pair_revoked.public.as_bytes());
+    let signer_b64 = base64_encode(pair_signer.public.as_bytes());
+
+    let rev_stmt = build_revocation_statement(&secret_signer, &revoked_b64, 1717776000, &signer_b64).unwrap();
+    assert!(verify_revocation(&rev_stmt).is_ok(), "cross-key revocation must verify");
+}
+
+/// Cannot verify a revocation statement against an artifact.
+#[test]
+fn test_cannot_verify_revocation_as_provenance() {
+    let seed = [15u8; 32];
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
+    let pair = origin_core::generate_keypair_from_seed(&seed);
+    let pub_b64 = base64_encode(pair.public.as_bytes());
+
+    let rev_stmt = build_revocation_statement(&secret, &pub_b64, 1717776000, &pub_b64).unwrap();
+    let encoded = encode_statement(&rev_stmt);
+
+    let result = verify_bytes(&encoded, b"some artifact");
+    assert!(result.is_err(), "verifying revocation against artifact must fail");
+}
+
 /// Verify error types.
 #[test]
 fn test_verification_error_types() {
     let seed = [9u8; 32];
-    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
     let data = b"error type test";
     let stmt = build_statement(&secret, data, 100, None).unwrap();
     let encoded = origin_core::encode_statement(&stmt);
@@ -217,25 +305,4 @@ fn test_verification_error_types() {
         *last ^= 1;
     }
     let _ = verify_bytes(&tampered, data);
-}
-
-/// Parent hash in canonical body — changing parent invalidates sig.
-#[test]
-fn test_parent_tamper_attack() {
-    let seed = [10u8; 32];
-    let secret = SecretKey::from_bytes(&seed).unwrap();
-    let data = b"child";
-
-    let stmt = build_statement(&secret, data, 100,
-        Some("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")).unwrap();
-    let encoded = origin_core::encode_statement(&stmt);
-
-    let text = String::from_utf8(encoded).unwrap();
-    let tampered = text.replace(
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    );
-
-    let result = verify_bytes(tampered.as_bytes(), data);
-    assert!(result.is_err(), "tampered parent must fail verification");
 }

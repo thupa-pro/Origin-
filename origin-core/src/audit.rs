@@ -1,4 +1,5 @@
 use crate::statement::Statement;
+use crate::hash::HashAlgorithm;
 
 fn timestamp_to_iso8601(ts: u64) -> String {
     let secs_per_day: u64 = 86400;
@@ -26,29 +27,61 @@ fn timestamp_to_iso8601(ts: u64) -> String {
     )
 }
 
+fn format_hash_alg(alg: &HashAlgorithm) -> &'static str {
+    match alg {
+        HashAlgorithm::Sha256 => "SHA-256",
+        HashAlgorithm::Sha384 => "SHA-384",
+        HashAlgorithm::Sha512 => "SHA-512",
+    }
+}
+
 pub fn audit(statement: &Statement) -> String {
-    let iso = timestamp_to_iso8601(statement.time);
-    let parent_line = if let Some(ref p) = statement.parent {
-        format!("├─ Parent:  {}\n", p)
-    } else {
-        String::new()
-    };
-    format!(
-        "Statement Audit\n\
-         ├─ Origin:  {}\n\
-         {}├─ Hash:    {} ({})\n\
-         ├─ Time:    {} ({}) — advisory\n\
-         ├─ Key:     {}\n\
-         └─ Sig:     {}",
-        statement.origin,
-        parent_line,
-        statement.hash,
-        statement.hash_alg,
-        iso,
-        statement.time,
-        statement.key_b64,
-        statement.sig_b64,
-    )
+    let type_str = statement.type_.as_str();
+    let mut output = format!("Statement Audit\n├─ Type:    {}\n", type_str);
+
+    match &statement.body {
+        crate::statement::StatementBody::Provenance { hash, hash_alg, time, .. } => {
+            let iso = timestamp_to_iso8601(*time);
+            let parent_line = if let Some(ref p) = statement.parent {
+                format!("├─ Parent:  {}\n", p)
+            } else {
+                String::new()
+            };
+            output.push_str(&format!(
+                "├─ Origin:  {}\n\
+                 {}├─ Hash:    {} ({})\n\
+                 ├─ Time:    {} ({}) — advisory\n\
+                 ├─ Key:     {}\n\
+                 └─ Sig:     {}",
+                statement.origin,
+                parent_line,
+                hash,
+                format_hash_alg(hash_alg),
+                iso,
+                time,
+                statement.key_b64,
+                statement.sig_b64,
+            ));
+        }
+        crate::statement::StatementBody::Revocation { revoked_key_b64, revoked_since, .. } => {
+            let since_iso = timestamp_to_iso8601(*revoked_since);
+            output.push_str(&format!(
+                "├─ Origin:  {}\n\
+                 ├─ Revoked: {} (key)\n\
+                 ├─ Since:   {} ({})\n\
+                 ├─ Key:     {} (signer)\n\
+                 └─ Sig:     {}",
+                statement.origin,
+                revoked_key_b64,
+                since_iso,
+                revoked_since,
+                statement.key_b64,
+                statement.sig_b64,
+            ));
+        }
+    }
+
+    output
 }
 
 pub fn audit_with_verdict(statement: &Statement, verify_result: &crate::error::Result<()>) -> String {

@@ -78,6 +78,7 @@ fn test_deterministic_canonical_body() {
     assert_eq!(body1, body2, "canonical body must be deterministic");
     assert!(!body1.ends_with(b"\n"), "canonical body must not have trailing newline");
     let body_str = String::from_utf8_lossy(&body1);
+    assert!(body_str.contains("type:"), "canonical body must include type");
     assert!(!body_str.contains("sig:"), "canonical body must not include signature");
     assert!(!body_str.contains("time:"), "canonical body must not include timestamp (advisory)");
 }
@@ -93,6 +94,7 @@ fn test_deterministic_canonical_body_with_parent() {
     let body = stmt.canonical_body();
     let body_str = String::from_utf8_lossy(&body);
 
+    assert!(body_str.contains("type:"), "canonical body must include type");
     assert!(body_str.contains("parent:"), "canonical body must include parent when present");
     assert!(!body_str.contains("time:"), "canonical body must not include timestamp");
     assert!(!body_str.contains("sig:"), "canonical body must not include signature");
