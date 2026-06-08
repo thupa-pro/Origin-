@@ -19,6 +19,22 @@ Origin answers one question with a single command: **"Did key X sign artifact Y?
 
 ---
 
+## Quick Install
+
+```bash
+# From source (Rust 1.85+)
+cargo install origin-cli
+
+# Linux binary (x86-64)
+curl -sL https://github.com/thupa-pro/Origin/releases/latest/download/origin-linux-x86_64.gz | gunzip > origin
+chmod +x origin && sudo mv origin /usr/local/bin/
+
+# GitHub Action (for your CI pipeline)
+# See .github/actions/origin-verify/action.yml
+```
+
+---
+
 ## One Command
 
 ```bash
@@ -26,6 +42,19 @@ origin verify release.tar.gz.origin release.tar.gz
 ```
 
 Returns `VERIFIED` or `FAILED`. That's it.
+
+---
+
+## GitHub Action
+
+Verify release artifacts in your CI pipeline:
+
+```yaml
+- uses: thupa-pro/Origin/.github/actions/origin-verify@v1
+  with:
+    statement: release.tar.gz.origin
+    artifact: release.tar.gz
+```
 
 ---
 
@@ -293,7 +322,7 @@ cargo test
 
 ---
 
-## Status: Beta
+## Status: Beta · [![Open Issues](https://img.shields.io/github/issues/thupa-pro/Origin)](https://github.com/thupa-pro/Origin/issues) [![Good First Issues](https://img.shields.io/github/issues/thupa-pro/Origin/good%20first%20issue)](https://github.com/thupa-pro/Origin/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 
 Origin v1.1.0. The protocol primitive is frozen. The API is stable. The format will not break without a major version bump.
 

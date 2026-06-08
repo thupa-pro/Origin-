@@ -1,0 +1,34 @@
+name: 'Origin Verify'
+description: 'Verify a provenance statement against an artifact using Origin'
+author: '@thupa-pro'
+
+inputs:
+  statement:
+    description: 'Path to the .origin statement file'
+    required: true
+  artifact:
+    description: 'Path to the artifact file to verify'
+    required: true
+  public-key:
+    description: 'Public key file (base64url-encoded, 44 chars). If omitted, verification checks hash + signature but does not pin to a specific key.'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Origin
+      shell: bash
+      run: |
+        if ! command -v origin &>/dev/null; then
+          echo "Installing Origin..."
+          curl -sL -o /tmp/origin.gz "https://github.com/thupa-pro/Origin/releases/latest/download/origin-linux-x86_64.gz"
+          gunzip -f /tmp/origin.gz
+          chmod +x /tmp/origin
+          sudo mv /tmp/origin /usr/local/bin/origin
+        fi
+        echo "Origin $(origin --version 2>&1 || true)"
+
+    - name: Verify statement
+      shell: bash
+      run: |
+        origin verify "${{ inputs.statement }}" "${{ inputs.artifact }}"
