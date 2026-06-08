@@ -34,6 +34,7 @@ fn format_hash_alg(alg: &crate::hash::HashAlgorithm) -> &'static str {
     }
 }
 
+/// Produce a human-readable audit report of a provenance statement.
 pub fn audit(statement: &Statement) -> String {
     let iso = timestamp_to_iso8601(statement.time);
     let parent_line = if let Some(ref p) = statement.parent {
@@ -59,6 +60,7 @@ pub fn audit(statement: &Statement) -> String {
     )
 }
 
+/// Produce a human-readable audit report with verification verdict appended.
 pub fn audit_with_verdict(statement: &Statement, verify_result: &crate::error::Result<()>) -> String {
     let verdict = match verify_result {
         Ok(()) => "VERIFIED".to_string(),

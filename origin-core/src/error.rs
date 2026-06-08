@@ -1,19 +1,29 @@
 use thiserror::Error;
 
+/// Errors that can occur during parsing, signing, or verification of
+/// provenance statements.
+///
+/// All error variants implement `Display` and `std::error::Error`.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum Error {
+    /// A general error message (catch-all for non-categorized errors).
     #[error("{0}")]
     Message(String),
 
+    /// The statement is malformed — wrong line count, bad field format,
+    /// invalid base64url, out-of-range timestamp, etc.
     #[error("Invalid statement: {0}")]
     Format(String),
 
+    /// A cryptographic operation failed (key invalid, signature invalid, etc.).
     #[error("Cryptographic error: {0}")]
     Crypto(String),
 
+    /// The artifact hash does not match the hash in the statement.
     #[error("Hash mismatch: expected {expected}, got {actual}")]
     HashMismatch { expected: String, actual: String },
 
+    /// An I/O error occurred (file not found, permission denied, etc.).
     #[error("I/O error: {0}")]
     Io(String),
 }

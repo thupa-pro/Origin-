@@ -9,18 +9,36 @@ const KEY_B64_LEN: usize = 44;
 const SIG_B64_LEN: usize = 88;
 const HEX_CHARS: &[u8] = b"0123456789abcdef";
 
+/// A parsed provenance statement.
+///
+/// Contains all fields of a provenance statement in both encoded and decoded
+/// form. Constructed by `Statement::parse()` or `build_statement()`.
+///
+/// The canonical body (what is signed) consists of origin, type, parent,
+/// hash, and key — time and sig are excluded.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Statement {
+    /// Protocol version (always "v1").
     pub origin: String,
+    /// Optional parent statement hash (for provenance chaining).
     pub parent: Option<String>,
+    /// Full hash string with algorithm prefix (e.g. `sha256:<hex>`).
     pub hash: String,
+    /// Hash digest as lowercase hex (without algorithm prefix).
     pub hash_hex: String,
+    /// Hash algorithm (SHA-256, SHA-384, or SHA-512).
     pub hash_alg: HashAlgorithm,
+    /// Hash digest as raw bytes.
     pub hash_bytes: Vec<u8>,
+    /// Self-asserted UNIX timestamp (advisory — not in canonical body).
     pub time: u64,
+    /// Public key as base64url string (44 chars with padding).
     pub key_b64: String,
+    /// Public key as raw 32 bytes.
     pub key_bytes: [u8; 32],
+    /// Signature as base64url string (88 chars with padding).
     pub sig_b64: String,
+    /// Signature as raw 64 bytes.
     pub sig_bytes: [u8; 64],
     raw_lines: Vec<String>,
     parent_present: bool,
@@ -127,6 +145,13 @@ fn validate_timestamp(value: &str) -> Result<u64> {
 }
 
 impl Statement {
+    /// Parse a statement from raw bytes (the .origin file content).
+    ///
+    /// Validates all structural and field constraints. Returns the parsed
+    /// `Statement` or an `Error::Format` with a descriptive message.
+    ///
+    /// This function does NOT perform cryptographic verification.
+    /// Use `verify_statement` or `verify_bytes` for that.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let text = std::str::from_utf8(data)
             .map_err(|_| Error::Format("not valid UTF-8".into()))?;
@@ -313,6 +338,28 @@ impl Statement {
     }
 }
 
+/// Build a signed provenance statement from a secret key, artifact, and timestamp.
+///
+/// This is the main entry point for signing. It hashes the artifact, derives
+/// the public key from the secret key, constructs the canonical body, signs
+/// it, and returns a complete `Statement`.
+///
+/// # Arguments
+///
+/// * `secret` — The Ed25519 secret key (32 bytes)
+/// * `artifact_bytes` — The artifact bytes to sign
+/// * `timestamp` — Self-asserted UNIX timestamp (advisory, not in canonical body)
+/// * `parent_hash` — Optional parent statement hash for provenance chaining
+///
+/// # Returns
+///
+/// * `Ok(Statement)` — The signed statement (use `encode_statement` to serialize)
+/// * `Err(Error)` — Signing failed (cryptographic error)
+///
+/// # Determinism
+///
+/// Same inputs always produce the same output. This is guaranteed by the
+/// Ed25519 signature scheme (no random nonces) and verified by test.
 pub fn build_statement(
     secret: &crypto::SecretKey,
     artifact_bytes: &[u8],
@@ -386,6 +433,9 @@ pub fn build_statement(
     })
 }
 
+/// Encode a statement as a byte sequence (the .origin file content).
+///
+/// The output is a UTF-8 encoded text file with `\n` line endings.
 pub fn encode_statement(stmt: &Statement) -> Vec<u8> {
     let mut result = String::new();
     for line in &stmt.raw_lines {
@@ -395,6 +445,13 @@ pub fn encode_statement(stmt: &Statement) -> Vec<u8> {
     result.into_bytes()
 }
 
+/// Verify a parsed statement against artifact bytes.
+///
+/// Checks that:
+/// 1. The artifact hash matches the statement's hash field
+/// 2. The Ed25519 signature is valid for the canonical body
+///
+/// For most users, `verify_bytes` is simpler — it handles parsing too.
 pub fn verify_statement(stmt: &Statement, artifact_bytes: &[u8]) -> Result<()> {
     let (actual_hash_hex, _) = hash::hash_data(artifact_bytes, &stmt.hash_alg);
     if actual_hash_hex != stmt.hash_hex {
