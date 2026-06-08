@@ -2,7 +2,12 @@
 name = "origin-core"
 version = "1.0.0"
 edition = "2024"
+license = "MIT"
 description = "Origin Protocol — cryptographic provenance for digital artifacts"
+homepage = "https://github.com/thupa-pro/Origin"
+repository = "https://github.com/thupa-pro/Origin"
+keywords = ["provenance", "signing", "verification", "cryptography", "supply-chain"]
+categories = ["cryptography", "command-line-utilities"]
 
 [dependencies]
 ed25519-dalek = { version = "2", features = ["digest"] }

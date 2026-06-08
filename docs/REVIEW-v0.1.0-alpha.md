@@ -69,7 +69,7 @@ prominently.
 
 | Attack | Severity | Mitigation |
 |---|---|---|
-| Signature forgery via weak Ed25519 implementation | Critical | `ed25519-dalek` — audited, constant-time, formally verified binding curve ops |
+| Signature forgery via weak Ed25519 implementation | Critical | `ed25519-dalek` — audited, constant-time, formally verified curve ops |
 | Hash collision | Critical (if successful) | 128-bit collision bound — computationally infeasible |
 | Parser injection (control chars, BOM, CR, null, non-UTF-8) | High | All rejected at parse time. 28 negative tests. |
 | Decoded-length mismatch (44 chars → 33 bytes) | Medium | Fixed in `validate_base64url` (HEAD) |

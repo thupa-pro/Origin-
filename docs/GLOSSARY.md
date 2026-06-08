@@ -28,7 +28,7 @@ Time and sig are excluded from the canonical body.
 
 ### Deterministic
 
-Same inputs always produce the same output. For Origin: given the same secret key seed, same artifact bytes, and same timestamp, `build_statement` always produces the identical sequence of bytes. This is verified by test.
+Same inputs always produce the same output. For Origin: given the same secret key seed, same artifact bytes, and same timestamp, `build_statement` always produces the identical sequence of bytes. This is verified by tests.
 
 ### Ed25519
 

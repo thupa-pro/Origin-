@@ -359,7 +359,7 @@ impl Statement {
 /// # Determinism
 ///
 /// Same inputs always produce the same output. This is guaranteed by the
-/// Ed25519 signature scheme (no random nonces) and verified by test.
+/// Ed25519 signature scheme (no random nonces) and verified by tests.
 pub fn build_statement(
     secret: &crypto::SecretKey,
     artifact_bytes: &[u8],

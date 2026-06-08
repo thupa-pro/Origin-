@@ -57,7 +57,7 @@ The adversary is NOT assumed to be able to:
 │       └─ Rejected: exactly 5 lines enforced                  │
 │                                                              │
 ├─ 5. Replay a statement with a different timestamp            │
-│   └─ Not an attack: timestamp is part of signed body.        │
+    │   └─ Not an attack: timestamp is not part of the signed body.        │
 │       If the adversary changes the timestamp, the signature   │
 │       breaks. The original statement is immutable.            │
 │                                                              │

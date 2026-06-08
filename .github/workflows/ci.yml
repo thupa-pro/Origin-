@@ -27,6 +27,10 @@ jobs:
       run: cargo test
     - name: Docs
       run: cargo doc --no-deps --document-private-items
+    - name: Deny
+      run: |
+        cargo install cargo-deny --quiet 2>/dev/null || true
+        cargo deny check
     - name: Audit
       run: |
         cargo install cargo-audit --quiet 2>/dev/null || true

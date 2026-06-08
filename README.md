@@ -209,7 +209,7 @@ Key design points:
 - **No blockchain**: Statements are files, not transactions
 - **No database**: The statement is the record
 - **No identity system**: The public key is the identity
-- **No metadata**: Cryptographic only — no notes, tags, or labels
+- **No metadata**: Cryptographic claims only — no notes, tags, or labels
 - **No encryption**: Statements are public by design
 - **Timestamps are advisory**: Self-asserted, not signed. Honest design.
 

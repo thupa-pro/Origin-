@@ -244,10 +244,11 @@ fn test_verification_error_types() {
     let encoded = origin_core::encode_statement(&stmt);
 
     let r = verify_bytes(&encoded, b"wrong data");
-    match r {
-        Err(origin_core::Error::HashMismatch { .. }) => {}
-        other => panic!("expected HashMismatch error, got {:?}", other),
-    }
+    assert!(
+        matches!(r, Err(origin_core::Error::HashMismatch { .. })),
+        "expected HashMismatch error, got {:?}",
+        r
+    );
 
     let mut tampered = encoded.clone();
     if let Some(last) = tampered.last_mut() {

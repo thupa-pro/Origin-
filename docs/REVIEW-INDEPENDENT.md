@@ -112,7 +112,7 @@ Current set: `(hash, key, time, sig)`. The absolute minimum is `(hash, key, sig)
 | Granularity | Arbitrary artifact (any file) | Git commit object only |
 | Notarization | Self-contained file | Embedded in Git DAG |
 | Offline | ✅ Full | ✅ Full |
-| Chain-ability | Via parent field | Via parent commit pointers |
+| Chainability | Via parent field | Via parent commit pointers |
 | Key management | Plain Ed25519 key file | GPG keyring, SSH agent |
 | Complexity | 1 binary, 5 commands | GPG + git-config + keyring |
 
