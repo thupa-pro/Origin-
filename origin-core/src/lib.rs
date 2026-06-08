@@ -7,10 +7,7 @@ pub mod statement;
 pub use crypto::{generate_keypair, generate_keypair_from_seed, Keypair, PublicKey, SecretKey, Signature};
 pub use error::{Error, Result};
 pub use hash::hash_bytes;
-pub use statement::{
-    build_revocation_statement, build_statement, encode_statement, verify_revocation,
-    verify_statement, Statement, StatementBody, StatementType,
-};
+pub use statement::{build_statement, encode_statement, verify_statement, Statement};
 
 pub type Verdict = std::result::Result<(), Error>;
 

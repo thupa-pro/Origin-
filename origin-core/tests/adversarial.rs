@@ -1,6 +1,5 @@
 use origin_core::{
-    base64_encode, build_revocation_statement, build_statement, encode_statement, verify_bytes,
-    verify_revocation, Statement,
+    base64_encode, build_statement, verify_bytes, Statement,
 };
 
 /// Timestamp is now advisory — changing it does NOT break verification.
@@ -69,7 +68,7 @@ fn test_malformed_statement_preserving_sig() {
             "hash: ",
             "hash: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         ),
-        text.replace("type: provenance", "type: revocation"),
+        text.replace("type: provenance", "type: provenance2"),
     ];
 
     for tampered in attacks {
@@ -188,7 +187,7 @@ fn test_canonical_body_integrity_with_parent() {
 
     let text = String::from_utf8(encoded).unwrap();
     let lines: Vec<&str> = text.lines().collect();
-    // With parent: line order is [origin, type, parent, hash, time, key, sig]
+    // With parent: [origin, type, parent, hash, time, key, sig]
     let expected_canonical = format!("{}\n{}\n{}\n{}\n{}", lines[0], lines[1], lines[2], lines[3], lines[5]);
 
     assert_eq!(
@@ -233,56 +232,6 @@ fn test_type_field_tamper() {
 
     let result = verify_bytes(tampered.as_bytes(), data);
     assert!(result.is_err(), "tampered type must fail");
-}
-
-/// Verify revocation statement build, parse, and signature.
-#[test]
-fn test_revocation_lifecycle() {
-    let seed = [12u8; 32];
-    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
-    let pair = origin_core::generate_keypair_from_seed(&seed);
-    let pub_b64 = base64_encode(pair.public.as_bytes());
-
-    let rev_stmt = build_revocation_statement(&secret, &pub_b64, 1717776000, &pub_b64).unwrap();
-    assert_eq!(rev_stmt.type_, origin_core::StatementType::Revocation);
-    assert_eq!(rev_stmt.revoked_key_b64(), Some(pub_b64.as_str()));
-    assert_eq!(rev_stmt.revoked_since(), Some(1717776000));
-
-    let encoded = encode_statement(&rev_stmt);
-    let parsed = Statement::parse(&encoded).unwrap();
-    assert_eq!(parsed.type_, origin_core::StatementType::Revocation);
-
-    assert!(verify_revocation(&rev_stmt).is_ok(), "self-issued revocation must verify");
-}
-
-/// Revocation of a different key (key K revokes key R).
-#[test]
-fn test_revocation_different_signer() {
-    let seed_signer = [13u8; 32];
-    let seed_revoked = [14u8; 32];
-    let secret_signer = origin_core::SecretKey::from_bytes(&seed_signer).unwrap();
-    let pair_revoked = origin_core::generate_keypair_from_seed(&seed_revoked);
-    let pair_signer = origin_core::generate_keypair_from_seed(&seed_signer);
-    let revoked_b64 = base64_encode(pair_revoked.public.as_bytes());
-    let signer_b64 = base64_encode(pair_signer.public.as_bytes());
-
-    let rev_stmt = build_revocation_statement(&secret_signer, &revoked_b64, 1717776000, &signer_b64).unwrap();
-    assert!(verify_revocation(&rev_stmt).is_ok(), "cross-key revocation must verify");
-}
-
-/// Cannot verify a revocation statement against an artifact.
-#[test]
-fn test_cannot_verify_revocation_as_provenance() {
-    let seed = [15u8; 32];
-    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
-    let pair = origin_core::generate_keypair_from_seed(&seed);
-    let pub_b64 = base64_encode(pair.public.as_bytes());
-
-    let rev_stmt = build_revocation_statement(&secret, &pub_b64, 1717776000, &pub_b64).unwrap();
-    let encoded = encode_statement(&rev_stmt);
-
-    let result = verify_bytes(&encoded, b"some artifact");
-    assert!(result.is_err(), "verifying revocation against artifact must fail");
 }
 
 /// Verify error types.

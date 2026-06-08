@@ -10,31 +10,22 @@ fn assert_parse_ok(data: &[u8], hint: &str) {
     assert!(result.is_ok(), "expected parse success for {}: {:?}", hint, result.err());
 }
 
-fn valid_provenance() -> Vec<u8> {
+fn valid_statement() -> Vec<u8> {
     b"origin: v1\ntype: provenance\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n".to_vec()
 }
 
-fn valid_provenance_with_parent() -> Vec<u8> {
+fn valid_with_parent() -> Vec<u8> {
     b"origin: v1\ntype: provenance\nparent: sha256:1111111111111111111111111111111111111111111111111111111111111111\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n".to_vec()
 }
 
-fn valid_revocation() -> Vec<u8> {
-    b"origin: v1\ntype: revocation\nrevoked: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsince: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n".to_vec()
+#[test]
+fn test_parse_valid() {
+    assert_parse_ok(&valid_statement(), "valid statement");
 }
 
 #[test]
-fn test_parse_valid_provenance() {
-    assert_parse_ok(&valid_provenance(), "valid provenance statement");
-}
-
-#[test]
-fn test_parse_valid_provenance_with_parent() {
-    assert_parse_ok(&valid_provenance_with_parent(), "valid provenance with parent");
-}
-
-#[test]
-fn test_parse_valid_revocation() {
-    assert_parse_ok(&valid_revocation(), "valid revocation statement");
+fn test_parse_valid_with_parent() {
+    assert_parse_ok(&valid_with_parent(), "valid statement with parent");
 }
 
 // ── Structural ──
@@ -46,8 +37,7 @@ fn test_too_few_lines() {
 
 #[test]
 fn test_too_many_lines() {
-    // 8 lines exceeds the max of 7
-    let mut v = valid_provenance();
+    let mut v = valid_statement();
     v.extend_from_slice(b"extra: x\n");
     v.extend_from_slice(b"extra2: y\n");
     assert_parse_fails(&v, "too many lines");
@@ -70,7 +60,7 @@ fn test_missing_trailing_newline() {
 #[test]
 fn test_bom() {
     let mut v = vec![0xef, 0xbb, 0xbf];
-    v.extend_from_slice(&valid_provenance());
+    v.extend_from_slice(&valid_statement());
     assert_parse_fails(&v, "BOM");
 }
 
@@ -94,7 +84,6 @@ fn test_wrong_key_order() {
 
 #[test]
 fn test_wrong_key_order_with_parent() {
-    // 7 lines but second key is not 'type'
     let data = b"origin: v1\nhash: sha256:abc\ntype: provenance\nparent: x\ntime: 0\nkey: xxxxx\nsig: xxxxx\n";
     assert_parse_fails(data, "wrong key order with parent (hash before type)");
 }
@@ -121,7 +110,7 @@ fn test_missing_separator() {
 
 #[test]
 fn test_bad_origin() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let tampered = text.replace("origin: v1", "origin: v0");
     assert_parse_fails(tampered.as_bytes(), "wrong origin version");
@@ -129,7 +118,7 @@ fn test_bad_origin() {
 
 #[test]
 fn test_bad_type() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let tampered = text.replace("type: provenance", "type: invalid");
     assert_parse_fails(tampered.as_bytes(), "invalid type");
@@ -137,7 +126,7 @@ fn test_bad_type() {
 
 #[test]
 fn test_bad_hash_prefix() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let tampered = text.replace("sha256:", "md5:");
     assert_parse_fails(tampered.as_bytes(), "bad hash prefix");
@@ -145,7 +134,7 @@ fn test_bad_hash_prefix() {
 
 #[test]
 fn test_hash_uppercase() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let tampered = text.to_uppercase();
     assert_parse_fails(tampered.as_bytes(), "uppercase hash");
@@ -153,7 +142,7 @@ fn test_hash_uppercase() {
 
 #[test]
 fn test_hash_too_short() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let tampered = text.replace(
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -183,7 +172,7 @@ fn test_hash_alg_unknown() {
 
 #[test]
 fn test_timestamp_leading_zero() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let tampered = text.replace("time: 0", "time: 01");
     assert_parse_fails(tampered.as_bytes(), "leading zero in timestamp");
@@ -191,7 +180,7 @@ fn test_timestamp_leading_zero() {
 
 #[test]
 fn test_timestamp_non_digit() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let tampered = text.replace("time: 0", "time: abc");
     assert_parse_fails(tampered.as_bytes(), "non-digit timestamp");
@@ -199,7 +188,7 @@ fn test_timestamp_non_digit() {
 
 #[test]
 fn test_timestamp_overflow() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let tampered = text.replace("time: 0", "time: 999999999999");
     assert_parse_fails(tampered.as_bytes(), "timestamp overflow");
@@ -207,7 +196,7 @@ fn test_timestamp_overflow() {
 
 #[test]
 fn test_key_wrong_length() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let tampered = text.replace(
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
@@ -218,7 +207,7 @@ fn test_key_wrong_length() {
 
 #[test]
 fn test_sig_wrong_length() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let tampered = text.replace(
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
@@ -229,7 +218,7 @@ fn test_sig_wrong_length() {
 
 #[test]
 fn test_key_invalid_base64url() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let tampered = text.replace(
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
@@ -240,7 +229,7 @@ fn test_key_invalid_base64url() {
 
 #[test]
 fn test_key_decoded_length_mismatch() {
-    let v = valid_provenance();
+    let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
     let unpadded_44 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     assert_eq!(unpadded_44.len(), 44, "test input must be 44 chars");
@@ -279,27 +268,4 @@ fn test_non_utf8() {
 fn test_tab_in_value() {
     let data = b"origin: v1\ntype: provenance\nhash: sha256:abc\ntime: 0\nkey: xx\txx\nsig: xxxx\n";
     assert_parse_fails(data, "tab in value");
-}
-
-// ── Revocation-specific ──
-
-#[test]
-fn test_revocation_wrong_key_order() {
-    let data = b"origin: v1\ntype: revocation\nsince: 0\nrevoked: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n";
-    assert_parse_fails(data, "revocation wrong key order (since before revoked)");
-}
-
-#[test]
-fn test_revocation_too_many_lines() {
-    let mut v = valid_revocation();
-    v.extend_from_slice(b"extra: x\n");
-    assert_parse_fails(&v, "revocation too many lines");
-}
-
-#[test]
-fn test_revocation_bad_revoked_key() {
-    let v = valid_revocation();
-    let text = String::from_utf8(v).unwrap();
-    let tampered = text.replace("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "invalid");
-    assert_parse_fails(tampered.as_bytes(), "revocation bad revoked key");
 }

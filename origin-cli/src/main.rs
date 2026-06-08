@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use origin_core::{
-    base64_encode, build_revocation_statement, build_statement, encode_statement,
-    generate_keypair, hash, verify_bytes, verify_revocation, SecretKey, Statement, StatementType,
+    base64_encode, build_statement, encode_statement, generate_keypair, hash, verify_bytes,
+    SecretKey, Statement,
 };
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -86,46 +86,9 @@ enum Commands {
     ///
     /// Examples:
     ///   origin audit myapp.origin
-    ///   origin audit revocation-abc123.origin
     Audit {
         /// Path to the statement file
         statement: PathBuf,
-    },
-    /// Create a revocation statement for a compromised key
-    ///
-    /// Produces a revocation-<prefix>.origin file. The revocation is signed
-    /// by the secret key provided via --key and declares that statements
-    /// signed by the --revoked key with timestamp >= --since should not be
-    /// trusted.
-    ///
-    /// Examples:
-    ///   origin revoke --key origin-secret.key --revoked <base64> --since 1717776000
-    ///   origin revoke --key origin-secret.key --revoked $(cat origin-public.key)
-    Revoke {
-        /// Path to the secret key file (or '-' for stdin, or $ORIGIN_KEY env)
-        #[arg(long, short)]
-        key: Option<String>,
-        /// Base64-encoded Ed25519 public key being revoked
-        #[arg(long)]
-        revoked: String,
-        /// Unix timestamp after which statements by the revoked key should not be trusted (default: now)
-        #[arg(long)]
-        since: Option<u64>,
-    },
-    /// Check revocation status of a statement
-    ///
-    /// Checks whether a provenance statement is revoked by a given revocation
-    /// statement. Prints REVOKED if the statement's timestamp >= the revocation's
-    /// 'since' field. Also verifies the revocation statement's own signature.
-    ///
-    /// Examples:
-    ///   origin check myapp.origin --revocation revocation-abc123.origin
-    Check {
-        /// Path to the statement file to check
-        statement: PathBuf,
-        /// Path to a revocation statement file
-        #[arg(long)]
-        revocation: PathBuf,
     },
 }
 
@@ -243,11 +206,7 @@ fn main() {
                         std::process::exit(1);
                     }
                 };
-                if parent_stmt.type_ != StatementType::Provenance {
-                    eprintln!("error: parent statement must be a provenance statement, got {:?}", parent_stmt.type_);
-                    std::process::exit(1);
-                }
-                Some(parent_stmt.hash_str().unwrap().to_string())
+                Some(parent_stmt.hash)
             } else {
                 None
             };
@@ -319,101 +278,6 @@ fn main() {
                     eprintln!("error: cannot parse statement: {}", e);
                     std::process::exit(1);
                 }
-            }
-        }
-        Commands::Revoke { key, revoked, since } => {
-            let secret = match load_secret_key(&key) {
-                Ok(k) => k,
-                Err(e) => {
-                    eprintln!("error: {}", e);
-                    std::process::exit(1);
-                }
-            };
-
-            // Get the public key of the signer for the revocation statement
-            let pair = origin_core::generate_keypair_from_seed(&secret.0);
-            let signer_pub_b64 = base64_encode(&pair.public.0);
-
-            let ts = since.unwrap_or_else(current_timestamp);
-
-            let stmt = match build_revocation_statement(&secret, &revoked, ts, &signer_pub_b64) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("error: {}", e);
-                    std::process::exit(1);
-                }
-            };
-
-            let encoded = encode_statement(&stmt);
-            let out_path = format!("revocation-{}.origin", &revoked[..8]);
-            match std::fs::write(&out_path, &encoded) {
-                Ok(_) => {
-                    println!("Revocation statement written to {}", out_path);
-                }
-                Err(e) => {
-                    eprintln!("error: cannot write revocation: {}", e);
-                    std::process::exit(1);
-                }
-            }
-        }
-        Commands::Check { statement, revocation } => {
-            let stmt_data = match std::fs::read(&statement) {
-                Ok(d) => d,
-                Err(e) => {
-                    eprintln!("error: cannot read '{}': {}", statement.display(), e);
-                    std::process::exit(1);
-                }
-            };
-            let stmt = match Statement::parse(&stmt_data) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("error: invalid statement: {}", e);
-                    std::process::exit(1);
-                }
-            };
-
-            let rev_data = match std::fs::read(&revocation) {
-                Ok(d) => d,
-                Err(e) => {
-                    eprintln!("error: cannot read '{}': {}", revocation.display(), e);
-                    std::process::exit(1);
-                }
-            };
-            let rev_stmt = match Statement::parse(&rev_data) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("error: invalid revocation statement: {}", e);
-                    std::process::exit(1);
-                }
-            };
-
-            if rev_stmt.type_ != StatementType::Revocation {
-                eprintln!("error: '{}' is not a revocation statement", revocation.display());
-                std::process::exit(1);
-            }
-
-            // Verify the revocation statement's own signature
-            if let Err(e) = verify_revocation(&rev_stmt) {
-                eprintln!("error: revocation signature is invalid: {}", e);
-                std::process::exit(1);
-            }
-
-            // Check if this revocation applies to the statement's key
-            let revoked_key = rev_stmt.revoked_key_b64().unwrap_or("");
-            if revoked_key != stmt.key_b64 {
-                println!("KEY NOT REVOKED — revocation targets a different key");
-                return;
-            }
-
-            let stmt_time = stmt.time().unwrap_or(0);
-            let rev_since = rev_stmt.revoked_since().unwrap_or(0);
-
-            if stmt_time >= rev_since {
-                println!("REVOKED — statement timestamp {} >= revocation since {}",
-                    stmt_time, rev_since);
-            } else {
-                println!("NOT REVOKED — statement timestamp {} < revocation since {}",
-                    stmt_time, rev_since);
             }
         }
     }
