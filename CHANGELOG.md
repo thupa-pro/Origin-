@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.1.1 — 2026-06-09
 
 - Fuzz testing: cargo-fuzz targets for parser and verify functions
 - Reproducible builds: .cargo/config.toml with remap-path-prefix, release profile with codegen-units=1, LTO=fat, strip

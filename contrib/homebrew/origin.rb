@@ -4,12 +4,12 @@ class Origin < Formula
   license "MIT"
 
   stable do
-    url "https://github.com/thupa-pro/Origin/archive/refs/tags/v1.1.0.tar.gz"
-    sha256 "291271c36c0ecf4d15efa505933031fa07abcca474a67b58cdfcc5fb8207c61d"
+    url "https://github.com/thupa-pro/Origin/archive/refs/tags/v1.1.1.tar.gz"
+    sha256 "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"
 
     resource "origin-core" do
-      url "https://github.com/thupa-pro/Origin/archive/refs/tags/v1.1.0.tar.gz"
-      sha256 "291271c36c0ecf4d15efa505933031fa07abcca474a67b58cdfcc5fb8207c61d"
+      url "https://github.com/thupa-pro/Origin/archive/refs/tags/v1.1.1.tar.gz"
+      sha256 "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"
     end
   end
 

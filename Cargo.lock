@@ -623,7 +623,7 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "origin-cli"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "base64",
  "clap",
@@ -633,7 +633,7 @@ dependencies = [
 
 [[package]]
 name = "origin-core"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "base64",
  "criterion",
