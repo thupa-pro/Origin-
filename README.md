@@ -318,8 +318,32 @@ Requires Rust 1.85+.
 git clone https://github.com/thupa-pro/Origin.git
 cd Origin
 cargo build --release
-./target/release/origin --help
 ```
+
+To run tests:
+```bash
+cargo test
+```
+
+---
+
+## Self-Verification
+
+Origin signs its own release artifacts. Anyone can verify:
+
+```bash
+# Download the release binary and its provenance statement
+curl -sLO https://github.com/thupa-pro/Origin/releases/latest/download/origin-linux-x86_64.gz
+curl -sLO https://github.com/thupa-pro/Origin/releases/latest/download/origin-linux-x86_64.origin
+
+# Download the trusted public key
+curl -sLO https://raw.githubusercontent.com/thupa-pro/Origin/main/docs/origin-public.key
+
+# Verify
+origin verify origin-linux-x86_64.origin origin-linux-x86_64.gz
+```
+
+The public key (`docs/origin-public.key`) is the trust anchor. Verify it through a separate channel (Signal, personal website, social media) before relying on it.
 
 To run tests:
 ```bash
