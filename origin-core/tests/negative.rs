@@ -269,3 +269,43 @@ fn test_tab_in_value() {
     let data = b"origin: v1\ntype: provenance\nhash: sha256:abc\ntime: 0\nkey: xx\txx\nsig: xxxx\n";
     assert_parse_fails(data, "tab in value");
 }
+
+use origin_core::{build_statement, encode_statement, verify_chain};
+use origin_core::SecretKey;
+
+#[test]
+fn test_verify_missing_parent() {
+    let seed = [42u8; 32];
+    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let child_artifact = b"child with parent ref";
+
+    let parent_hash = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
+    let child = build_statement(&secret, child_artifact, 100, Some(parent_hash)).unwrap();
+    let child_encoded = encode_statement(&child);
+
+    let result = verify_chain(&child_encoded, child_artifact, None, None);
+    assert!(result.is_err(), "must fail when parent is missing");
+    let err = format!("{}", result.unwrap_err());
+    assert!(err.contains("parent"), "error must mention parent: {}", err);
+}
+
+#[test]
+fn test_verify_wrong_parent() {
+    let seed = [42u8; 32];
+    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let parent_artifact = b"parent artifact";
+    let child_artifact = b"child artifact";
+
+    let parent = build_statement(&secret, parent_artifact, 100, None).unwrap();
+    let parent_encoded = encode_statement(&parent);
+
+    // Child references a DIFFERENT hash than the actual parent
+    let wrong_hash = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    let child = build_statement(&secret, child_artifact, 200, Some(wrong_hash)).unwrap();
+    let child_encoded = encode_statement(&child);
+
+    let result = verify_chain(&child_encoded, child_artifact, Some(&parent_encoded), Some(parent_artifact));
+    assert!(result.is_err(), "must fail when parent hash doesn't match");
+    let err = format!("{}", result.unwrap_err());
+    assert!(err.contains("Parent hash mismatch"), "error must indicate hash mismatch: {}", err);
+}

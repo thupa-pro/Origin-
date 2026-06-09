@@ -34,7 +34,10 @@ pub mod statement;
 pub use crypto::{generate_keypair, generate_keypair_from_seed, Keypair, PublicKey, SecretKey, Signature};
 pub use error::{Error, Result};
 pub use hash::hash_bytes;
-pub use statement::{build_statement, encode_statement, verify_statement, Statement};
+pub use statement::{
+    build_statement, build_statement_with_algorithm, encode_statement,
+    verify_statement, verify_chain, Statement,
+};
 
 /// Convenience type alias for verification results.
 pub type Verdict = std::result::Result<(), Error>;

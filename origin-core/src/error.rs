@@ -26,6 +26,14 @@ pub enum Error {
     /// An I/O error occurred (file not found, permission denied, etc.).
     #[error("I/O error: {0}")]
     Io(String),
+
+    /// The statement's parent field does not match the hash of the parent statement.
+    #[error("Parent hash mismatch: child parent field is {child_parent}, but actual parent hash is {actual_parent}")]
+    ParentMismatch { child_parent: String, actual_parent: String },
+
+    /// The statement has a parent field but no parent statement was provided.
+    #[error("Statement has a parent field but no parent statement was provided")]
+    MissingParent,
 }
 
 impl From<std::io::Error> for Error {

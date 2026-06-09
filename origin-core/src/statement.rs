@@ -338,7 +338,7 @@ impl Statement {
     }
 }
 
-/// Build a signed provenance statement from a secret key, artifact, and timestamp.
+/// Build a signed provenance statement (defaults to SHA-256).
 ///
 /// This is the main entry point for signing. It hashes the artifact, derives
 /// the public key from the secret key, constructs the canonical body, signs
@@ -366,8 +366,22 @@ pub fn build_statement(
     timestamp: u64,
     parent_hash: Option<&str>,
 ) -> Result<Statement> {
-    let (hash_hex_str, hash_bytes_vec) = hash::hash_data(artifact_bytes, &HashAlgorithm::Sha256);
-    let hash_str = format!("sha256:{}", hash_hex_str);
+    build_statement_with_algorithm(secret, artifact_bytes, timestamp, parent_hash, HashAlgorithm::Sha256)
+}
+
+/// Build a signed provenance statement with a specified hash algorithm.
+///
+/// Same as `build_statement` but allows choosing the hash algorithm.
+pub fn build_statement_with_algorithm(
+    secret: &crypto::SecretKey,
+    artifact_bytes: &[u8],
+    timestamp: u64,
+    parent_hash: Option<&str>,
+    algorithm: HashAlgorithm,
+) -> Result<Statement> {
+    let alg_prefix = algorithm.to_string();
+    let (hash_hex_str, hash_bytes_vec) = hash::hash_data(artifact_bytes, &algorithm);
+    let hash_str = format!("{}:{}", alg_prefix, hash_hex_str);
 
     let pair = crypto::generate_keypair_from_seed(&secret.0);
     let public_b64 = crate::base64_encode(pair.public.as_bytes());
@@ -421,7 +435,7 @@ pub fn build_statement(
         parent: parent_hash.map(|s| s.to_string()),
         hash: hash_str,
         hash_hex: hash_hex_str,
-        hash_alg: HashAlgorithm::Sha256,
+        hash_alg: algorithm,
         hash_bytes: hash_bytes_vec,
         time: timestamp,
         key_b64: public_b64,
@@ -465,4 +479,35 @@ pub fn verify_statement(stmt: &Statement, artifact_bytes: &[u8]) -> Result<()> {
     let canonical = stmt.canonical_body();
     let sig = crypto::Signature::from_bytes(&stmt.sig_bytes)?;
     crypto::verify(&public_key, &canonical, &sig)
+}
+
+/// Verify a statement and optionally verify its parent statement.
+///
+/// If the child statement has a `parent` field, `parent_bytes` and
+/// `parent_artifact_bytes` must be provided. The parent is verified against
+/// its artifact, and the child's parent field is checked against the parent's
+/// hash. If the child has no parent, the parent parameters are ignored.
+pub fn verify_chain(
+    child_bytes: &[u8],
+    child_artifact_bytes: &[u8],
+    parent_bytes: Option<&[u8]>,
+    parent_artifact_bytes: Option<&[u8]>,
+) -> Result<()> {
+    let child = Statement::parse(child_bytes)?;
+    verify_statement(&child, child_artifact_bytes)?;
+
+    if let Some(child_parent_hash) = &child.parent {
+        let parent_data = parent_bytes.ok_or(Error::MissingParent)?;
+        let parent_art = parent_artifact_bytes.ok_or(Error::MissingParent)?;
+        let parent = Statement::parse(parent_data)?;
+        verify_statement(&parent, parent_art)?;
+        if *child_parent_hash != parent.hash {
+            return Err(Error::ParentMismatch {
+                child_parent: child_parent_hash.clone(),
+                actual_parent: parent.hash.clone(),
+            });
+        }
+    }
+
+    Ok(())
 }

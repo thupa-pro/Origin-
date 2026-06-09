@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use origin_core::{
-    base64_encode, build_statement, encode_statement, generate_keypair, hash, verify_bytes,
-    SecretKey, Statement,
+    base64_encode, build_statement, encode_statement, generate_keypair, hash,
+    verify_chain, SecretKey, Statement,
 };
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -70,14 +70,20 @@ enum Commands {
     /// Returns VERIFIED if the statement is cryptographically valid for the
     /// given artifact. Returns FAILED with an error message otherwise.
     ///
+    /// If --parent is given, also verifies the parent statement in the chain.
+    ///
     /// Examples:
     ///   origin verify myapp.origin myapp
     ///   origin verify release-v1.0.0.origin release-v1.0.0.tar.gz
+    ///   origin verify child.origin child.tar.gz --parent parent.origin parent.tar.gz
     Verify {
         /// Path to the statement file
         statement: PathBuf,
         /// Path to the artifact file
         artifact: PathBuf,
+        /// Path to the parent statement and artifact (for chain verification)
+        #[arg(long, num_args = 2, value_names = ["STATEMENT", "ARTIFACT"])]
+        parent: Option<Vec<PathBuf>>,
     },
     /// Display a human-readable audit of a statement
     ///
@@ -235,6 +241,7 @@ fn main() {
         Commands::Verify {
             statement,
             artifact,
+            parent,
         } => {
             let stmt_data = match std::fs::read(&statement) {
                 Ok(d) => d,
@@ -251,7 +258,31 @@ fn main() {
                 }
             };
 
-            match verify_bytes(&stmt_data, &art_data) {
+            let (parent_stmt_data, parent_art_data) = if let Some(ref args) = parent {
+                if args.len() != 2 {
+                    eprintln!("error: --parent requires STATEMENT and ARTIFACT arguments");
+                    std::process::exit(1);
+                }
+                let ps = match std::fs::read(&args[0]) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("error: cannot read parent '{}': {}", args[0].display(), e);
+                        std::process::exit(1);
+                    }
+                };
+                let pa = match std::fs::read(&args[1]) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("error: cannot read parent artifact '{}': {}", args[1].display(), e);
+                        std::process::exit(1);
+                    }
+                };
+                (Some(ps), Some(pa))
+            } else {
+                (None, None)
+            };
+
+            match verify_chain(&stmt_data, &art_data, parent_stmt_data.as_deref(), parent_art_data.as_deref()) {
                 Ok(()) => {
                     println!("VERIFIED");
                 }

@@ -1,4 +1,7 @@
-use origin_core::{build_statement, encode_statement, generate_keypair_from_seed, hash};
+use origin_core::{
+    build_statement, build_statement_with_algorithm, encode_statement,
+    generate_keypair_from_seed, hash, verify_chain,
+};
 
 #[test]
 fn test_deterministic_hash() {
@@ -98,4 +101,66 @@ fn test_deterministic_canonical_body_with_parent() {
     assert!(body_str.contains("parent:"), "canonical body must include parent when present");
     assert!(!body_str.contains("time:"), "canonical body must not include timestamp");
     assert!(!body_str.contains("sig:"), "canonical body must not include signature");
+}
+
+#[test]
+fn test_deterministic_signing_sha384() {
+    let seed = [42u8; 32];
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
+    let data = b"sha384 test artifact";
+    let ts = 1717776000;
+
+    let stmt1 = build_statement_with_algorithm(&secret, data, ts, None, origin_core::hash::HashAlgorithm::Sha384).unwrap();
+    let stmt2 = build_statement_with_algorithm(&secret, data, ts, None, origin_core::hash::HashAlgorithm::Sha384).unwrap();
+
+    let enc1 = encode_statement(&stmt1);
+    let enc2 = encode_statement(&stmt2);
+    assert_eq!(enc1, enc2, "sha384 signing must be deterministic");
+    assert!(stmt1.hash.starts_with("sha384:"), "hash prefix must be sha384");
+}
+
+#[test]
+fn test_deterministic_signing_sha512() {
+    let seed = [42u8; 32];
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
+    let data = b"sha512 test artifact";
+    let ts = 1717776000;
+
+    let stmt1 = build_statement_with_algorithm(&secret, data, ts, None, origin_core::hash::HashAlgorithm::Sha512).unwrap();
+    let stmt2 = build_statement_with_algorithm(&secret, data, ts, None, origin_core::hash::HashAlgorithm::Sha512).unwrap();
+
+    let enc1 = encode_statement(&stmt1);
+    let enc2 = encode_statement(&stmt2);
+    assert_eq!(enc1, enc2, "sha512 signing must be deterministic");
+    assert!(stmt1.hash.starts_with("sha512:"), "hash prefix must be sha512");
+}
+
+#[test]
+fn test_verify_chain_valid() {
+    let seed = [42u8; 32];
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
+    let parent_artifact = b"parent artifact";
+    let child_artifact = b"child artifact";
+
+    let parent_stmt = build_statement(&secret, parent_artifact, 100, None).unwrap();
+    let parent_encoded = encode_statement(&parent_stmt);
+
+    let child_stmt = build_statement(&secret, child_artifact, 200, Some(&parent_stmt.hash)).unwrap();
+    let child_encoded = encode_statement(&child_stmt);
+
+    let result = verify_chain(&child_encoded, child_artifact, Some(&parent_encoded), Some(parent_artifact));
+    assert!(result.is_ok(), "valid chain must verify: {:?}", result);
+}
+
+#[test]
+fn test_verify_chain_no_parent_ok() {
+    let seed = [42u8; 32];
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
+    let artifact = b"standalone artifact";
+
+    let stmt = build_statement(&secret, artifact, 100, None).unwrap();
+    let encoded = encode_statement(&stmt);
+
+    let result = verify_chain(&encoded, artifact, None, None);
+    assert!(result.is_ok(), "standalone statement must verify: {:?}", result);
 }
