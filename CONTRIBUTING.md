@@ -96,10 +96,26 @@ make dist        # Build distribution tarball
 
 ### Release Tags
 
-Release tags must be signed with a GPG key:
+Release tags must be annotated (and signed if you have a GPG key):
+
 ```bash
-make tag-release VERSION=v1.2.0
+# With GPG signing (recommended):
+git tag -s v1.2.0 -m "Origin v1.2.0"
+git push origin v1.2.0
+
+# Without GPG (annotated only):
+git tag -a v1.2.0 -m "Origin v1.2.0"
+git push origin v1.2.0
 ```
+
+The CI release workflow will auto-build binaries, sign them with the release key,
+publish to crates.io, update `docs/origin-linux-x86_64.origin`, and move the `v1`
+floating tag to the new release.
+
+### Commits
+
+Commits don't need to be signed for day-to-day development, but the project
+maintainer's commits should be GPG-signed and verified by GitHub.
 
 ## Questions
 

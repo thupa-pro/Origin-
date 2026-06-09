@@ -40,6 +40,8 @@ jobs:
   build-binaries:
     runs-on: ubuntu-latest
     needs: create-release
+    permissions:
+      contents: write
     strategy:
       matrix:
         target:
@@ -61,6 +63,22 @@ jobs:
         rm -f /tmp/release.key
       env:
         ORIGIN_RELEASE_KEY: ${{ secrets.ORIGIN_RELEASE_KEY }}
+    - name: Update release provenance in docs (Linux only)
+      if: matrix.target == 'x86_64-unknown-linux-gnu'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git fetch origin main
+        git checkout main
+        cp target/${{ matrix.target }}/release/origin.origin docs/origin-linux-x86_64.origin
+        git add docs/origin-linux-x86_64.origin
+        git diff --cached --quiet || git commit -m "ci: update release provenance for ${{ github.ref_name }}"
+        git push
+    - name: Update v1 tag (Linux only)
+      if: matrix.target == 'x86_64-unknown-linux-gnu'
+      run: |
+        git tag -f v1
+        git push origin v1 --force
     - name: Upload binary
       uses: softprops/action-gh-release@v3
       with:
