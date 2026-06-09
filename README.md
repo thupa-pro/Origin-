@@ -33,6 +33,8 @@ chmod +x origin && sudo mv origin /usr/local/bin/
 # See .github/actions/origin-verify/action.yml
 ```
 
+After install, run `origin --help` to confirm. The binary is `origin`, not `origin-cli`.
+
 ---
 
 ## One Command
@@ -45,12 +47,31 @@ Returns `VERIFIED` or `FAILED`. That's it.
 
 ---
 
+## How Trust Works
+
+Origin separates the cryptographic verification from the trust decision:
+
+```
+1. Alice generates a key pair           →  Alice keeps the secret key
+2. Alice publishes the public key        →  On her website, social media, Keybase
+3. Alice signs a file with her secret key  →  Produces file.origin
+4. Bob downloads the file + .origin      →  From any channel
+5. Bob gets Alice's public key           →  From her website (trusted channel)
+6. Bob runs: origin verify file.origin file  →  VERIFIED
+```
+
+**The verifier must obtain the trusted public key through a separate channel.** The statement contains a public key, but a forged statement would contain a forged key. The protocol proves "key X signed artifact Y" — deciding whether to trust key X is the verifier's job.
+
+This is the same trust model as SSH and Signal. The key is the identity.
+
+---
+
 ## GitHub Action
 
 Verify release artifacts in your CI pipeline:
 
 ```yaml
-- uses: thupa-pro/Origin/.github/actions/origin-verify@v1
+- uses: thupa-pro/Origin/.github/actions/origin-verify@v1.1.0
   with:
     statement: release.tar.gz.origin
     artifact: release.tar.gz
@@ -294,9 +315,10 @@ See [THREAT_MODEL.md](docs/THREAT_MODEL.md) and [TRUST_MODEL.md](docs/TRUST_MODE
 Requires Rust 1.85+.
 
 ```bash
-gh repo clone thupa-pro/Origin
+git clone https://github.com/thupa-pro/Origin.git
 cd Origin
 cargo build --release
+./target/release/origin --help
 ```
 
 To run tests:

@@ -42,8 +42,8 @@ enum Commands {
     ///
     /// Writes a .origin file next to the artifact.
     /// Secret key sources (in priority order):
-    ///   1. `--key <file>`
-    ///   2. $ORIGIN_KEY environment variable
+    ///   1. $ORIGIN_KEY environment variable
+    ///   2. `--key <file>`
     ///   3. --key - (read from stdin)
     ///
     /// Examples:

@@ -57,9 +57,11 @@ The adversary is NOT assumed to be able to:
 │       └─ Rejected: exactly 5 lines enforced                  │
 │                                                              │
 ├─ 5. Replay a statement with a different timestamp            │
-    │   └─ Not an attack: timestamp is not part of the signed body.        │
-│       If the adversary changes the timestamp, the signature   │
-│       breaks. The original statement is immutable.            │
+│   └─ Not an attack: timestamp is not part of the signed body.│
+│       Changing it does not invalidate the signature. This is  │
+│       intentional — timestamps are advisory (see §9.3). The   │
+│       attacker gains nothing: replaying doesn't change who    │
+│       signed what artifact.                                   │
 │                                                              │
 ├─ 6. Exploit side channels                                    │
 │   └─ 6.1 Timing side channel in signature verification       │

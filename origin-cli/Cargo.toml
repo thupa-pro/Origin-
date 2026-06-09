@@ -9,6 +9,10 @@ repository = "https://github.com/thupa-pro/Origin"
 keywords = ["provenance", "signing", "verification", "cryptography", "supply-chain"]
 categories = ["cryptography", "command-line-utilities"]
 
+[[bin]]
+name = "origin"
+path = "src/main.rs"
+
 [dependencies]
 origin-core = { path = "../origin-core", version = "1.0.0" }
 clap = { version = "4", features = ["derive"] }
