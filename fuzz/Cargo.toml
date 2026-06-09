@@ -1,0 +1,15 @@
+[package]
+name = "origin-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+origin-core = { path = "../origin-core" }
+
+[profile.release]
+debug = 1

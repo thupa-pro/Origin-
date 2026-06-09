@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Fuzz testing: cargo-fuzz targets for parser and verify functions
+- Reproducible builds: .cargo/config.toml with remap-path-prefix, release profile with codegen-units=1, LTO=fat, strip
+- Release workflow: binaries auto-signed with Origin's own key during CI
+- CodeQL analysis workflow for automated security scanning
+- Homebrew formula in contrib/homebrew/origin.rb
+- Distroless Docker image (gcr.io/distroless/cc-debian12, USER nobody)
+- Benchmarks: criterion benchmarks for parse and verify hot paths
+- OpenSSF Scorecard workflow for supply-chain security assessment
+- Secret scanning workflow via TruffleHog
+- SBOM generation target (make sbom via cargo-cyclonedx)
+- Makefile targets: fuzz, bench, sbom, tag-release, dist
+
 ## v1.1.0 — 2026-06-08
 
 - Added `type: provenance` field for future extensibility without format breaks

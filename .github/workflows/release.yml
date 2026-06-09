@@ -52,7 +52,18 @@ jobs:
       with:
         target: ${{ matrix.target }}
     - run: cargo build --release --target ${{ matrix.target }}
+    - name: Sign binary with Origin
+      run: |
+        echo "${{ secrets.ORIGIN_RELEASE_KEY }}" > /tmp/release.key
+        ./target/${{ matrix.target }}/release/origin sign \
+          target/${{ matrix.target }}/release/origin \
+          --key /tmp/release.key
+        rm -f /tmp/release.key
+      env:
+        ORIGIN_RELEASE_KEY: ${{ secrets.ORIGIN_RELEASE_KEY }}
     - name: Upload binary
       uses: softprops/action-gh-release@v3
       with:
-        files: target/${{ matrix.target }}/release/origin
+        files: |
+          target/${{ matrix.target }}/release/origin
+          target/${{ matrix.target }}/release/origin.origin

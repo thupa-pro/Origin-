@@ -1,3 +1,10 @@
 [workspace]
 resolver = "2"
 members = ["origin-core", "origin-cli"]
+exclude = ["fuzz"]
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+strip = true
+opt-level = 3

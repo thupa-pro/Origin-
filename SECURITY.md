@@ -45,3 +45,10 @@ The following are out of scope:
 - "Key X signed artifact Y" when key X is compromised — key distribution is external
 - Timestamp is inaccurate — timestamps are self-asserted by design
 - A statement works on one machine but not another — check byte-for-byte identity
+
+## Security Posture
+
+- **Fuzz testing**: The parser is continuously fuzzed via `cargo-fuzz` with random inputs.
+- **Dependency auditing**: Automated via `cargo-audit` and `cargo-deny` in CI.
+- **CodeQL**: Static analysis runs on every push and pull request.
+- **Secret scanning**: Commits are scanned for secrets via TruffleHog.

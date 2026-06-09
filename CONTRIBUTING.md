@@ -11,9 +11,8 @@ This project follows the [Rust Code of Conduct](https://www.rust-lang.org/polici
 | Area | Description |
 |---|---|
 | **Language bindings** | Python, Go, JS/TypeScript bindings for the core library |
-| **Fuzz testing** | Add `cargo-fuzz` targets for the parser |
-| **Documentation** | Examples, tutorials, integration guides |
-| **Integration** | GitHub Action, Docker, Homebrew |
+| **Documentation** | Tutorials, integration guides, video walkthroughs |
+| **Integration** | GitHub Action improvements, additional CI platforms |
 | **Bug fixes** | Open issues labeled "bug" |
 
 ## How to Contribute
@@ -81,6 +80,26 @@ cargo build --release
 ```
 
 The core library is at `origin-core/`. The CLI is at `origin-cli/`.
+
+### Quick Commands
+
+```bash
+make check       # Run all checks (fmt, clippy, build, test, docs, deny)
+make coverage    # Code coverage report
+make fuzz        # Run fuzz tests (requires nightly)
+make bench       # Run benchmarks (requires nightly)
+make sbom        # Generate SBOM (requires cargo-cyclonedx)
+make man         # Install man page
+make tag-release VERSION=v1.1.1  # Create signed release tag
+make dist        # Build distribution tarball
+```
+
+### Release Tags
+
+Release tags must be signed with a GPG key:
+```bash
+make tag-release VERSION=v1.2.0
+```
 
 ## Questions
 

@@ -1,2 +1,18 @@
+# Build configuration for Origin
+#
+# Reproducible builds: remap source paths to `.` so binaries don't contain
+# absolute build paths. Combine with SOURCE_DATE_EPOCH for full reproducibility.
+#
+# Target directory is set to /tmp because /mnt/sdcard is fuseblk with noexec.
+
 [build]
 target-dir = "/tmp/origin-target"
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["--remap-path-prefix", "$PWD=."]
+
+[target.aarch64-apple-darwin]
+rustflags = ["--remap-path-prefix", "$PWD=."]
+
+[target.x86_64-apple-darwin]
+rustflags = ["--remap-path-prefix", "$PWD=."]

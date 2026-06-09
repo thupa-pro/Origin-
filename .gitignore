@@ -1,3 +1,6 @@
 /target/
+/tmp/
 *.origin
 !docs/*.origin
+fuzz/Cargo.lock
+dist/

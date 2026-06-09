@@ -1,7 +1,12 @@
 [![CI](https://github.com/thupa-pro/Origin/actions/workflows/ci.yml/badge.svg)](https://github.com/thupa-pro/Origin/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/thupa-pro/Origin/actions/workflows/codeql.yml/badge.svg)](https://github.com/thupa-pro/Origin/actions/workflows/codeql.yml)
+[![Coverage](https://coveralls.io/repos/github/thupa-pro/Origin/badge.svg)](https://coveralls.io/github/thupa-pro/Origin)
+[![crates.io](https://img.shields.io/crates/v/origin-core)](https://crates.io/crates/origin-core)
+[![docs.rs](https://img.shields.io/docsrs/origin-core)](https://docs.rs/origin-core)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Version](https://img.shields.io/github/v/tag/thupa-pro/Origin)](https://github.com/thupa-pro/Origin/tags)
 [![MSRV](https://img.shields.io/badge/rust-1.85%2B-purple)](rust-toolchain.toml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/thupa-pro/Origin/badge)](https://securityscorecards.dev/viewer/?uri=github.com/thupa-pro/Origin)
 
 # Origin — Cryptographic Provenance for Digital Artifacts
 
@@ -28,6 +33,9 @@ cargo install origin-cli
 # Linux binary (x86-64)
 curl -sL https://github.com/thupa-pro/Origin/releases/latest/download/origin-linux-x86_64.gz | gunzip > origin
 chmod +x origin && sudo mv origin /usr/local/bin/
+
+# Homebrew (macOS / Linux)
+brew install thupa-pro/Origin/origin
 
 # GitHub Action (for your CI pipeline)
 # See .github/actions/origin-verify/action.yml
@@ -279,16 +287,21 @@ Key design points:
 ## Features
 
 | Feature | Status |
-|---|---|
+|---|---|---|
 | Ed25519 signatures | ✅ |
 | SHA-256 / SHA-384 / SHA-512 | ✅ |
 | Deterministic output | ✅ |
+| Fuzz-tested parser | ✅ cargo-fuzz |
 | Strict parser (66 tests) | ✅ |
 | Parent field (provenance chains) | ✅ |
 | Self-contained statements | ✅ |
 | Secret key zeroization on drop | ✅ |
 | Stdin secret key (`--key -`) | ✅ |
 | `$ORIGIN_KEY` env var | ✅ |
+| Reproducible builds | ✅ |
+| Release binary self-verification | ✅ |
+| CodeQL analysis | ✅ |
+| SBOM generation | ✅ cargo-cyclonedx |
 
 ---
 
@@ -365,7 +378,7 @@ cargo test
 ## Documentation
 
 | Document | Description |
-|---|---|
+|---|---|---|
 | [RFC-0001.md](RFC-0001.md) | Full protocol specification |
 | [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) | Attack tree and adversary capabilities |
 | [docs/TRUST_MODEL.md](docs/TRUST_MODEL.md) | What the verifier trusts and doesn't trust |
@@ -375,6 +388,8 @@ cargo test
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Planned development milestones |
 | [docs/REVIEW-INDEPENDENT.md](docs/REVIEW-INDEPENDENT.md) | Independent protocol review |
 | [docs/GLOSSARY.md](docs/GLOSSARY.md) | Terminology reference |
+| [GOVERNANCE.md](GOVERNANCE.md) | Project governance and decision process |
+| [docs/origin.1](docs/origin.1) | Man page (`man origin`) |
 
 ---
 
