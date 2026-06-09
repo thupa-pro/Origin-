@@ -167,6 +167,16 @@ Displays all fields in human-readable form.
 
 ## Why Origin?
 
+### At a Glance
+
+| Without Origin | With Origin |
+|---|---|
+| You have a file and the author's claim | You have a file and a provenance statement |
+| No way to verify cryptographically | `origin verify file.origin file` |
+| Trust the download channel | Trust only the public key (distributed separately) |
+
+### Full Comparison
+
 | Need | GPG | Sigstore | in-toto | **Origin** |
 |---|---|---|---|---|
 | Offline verification | ✅ | ❌ | ✅ | **✅** |
@@ -191,7 +201,7 @@ Displays all fields in human-readable form.
 | `origin verify <statement> <artifact>` | Verify a statement against an artifact |
 | `origin audit <statement>` | Display a human-readable audit |
 
-Secret key sources (in priority): `--key <file>` > `$ORIGIN_KEY` env var > `--key -` (stdin).
+Secret key sources (in priority): `$ORIGIN_KEY` env var > `--key <file>` > `--key -` (stdin).
 
 ---
 

@@ -1,6 +1,6 @@
 [package]
 name = "origin-cli"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
 license = "MIT"
 description = "Origin Protocol CLI — hash, sign, verify, audit"
@@ -14,7 +14,7 @@ name = "origin"
 path = "src/main.rs"
 
 [dependencies]
-origin-core = { path = "../origin-core", version = "1.0.0" }
+origin-core = { path = "../origin-core", version = "1.1.0" }
 clap = { version = "4", features = ["derive"] }
 base64 = "0.22"
 thiserror = "2"

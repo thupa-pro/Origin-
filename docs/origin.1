@@ -1,0 +1,89 @@
+.\" Man page for origin
+.\" Origin Protocol — cryptographic provenance for digital artifacts
+.\"
+.TH ORIGIN 1 "2026-06-09" "1.1.0" "Origin Manual"
+.SH NAME
+origin \- cryptographic provenance for digital artifacts
+.SH SYNOPSIS
+.B origin
+\fIcommand\fR [\fIoptions\fR] [\fIargs\fR]
+.SH DESCRIPTION
+Origin is the smallest possible protocol for cryptographically verifiable
+digital provenance. It binds an artifact hash, a public key, and a timestamp
+into a self-contained signed statement. Anyone can verify \(em offline,
+instantly, with no dependencies.
+.P
+The statement is a 6- or 7-line UTF-8 text file (the \fI.origin\fR file)
+containing the artifact hash, timestamp, public key, and Ed25519 signature.
+The canonical body (what is signed) excludes the timestamp and signature.
+.SH COMMANDS
+.TP
+.B hash \fIpath\fR
+Compute the SHA-256 hash of a file.
+Prints \fIsha256:<hex>\fR to stdout.
+.TP
+.B keygen [\fB--output\fR \fIdir\fR]
+Generate an Ed25519 key pair.
+Writes \fIorigin-secret.key\fR and \fIorigin-public.key\fR to the
+specified directory (default: current directory).
+Public key is printed to stdout.
+Secret key file permissions are set to 0600 on Unix.
+.TP
+.B sign \fIpath\fR \fB--key\fR \fIfile\fR [\fB--time\fR \fIts\fR] [\fB--parent\fR \fIpath\fR]
+Sign an artifact, producing a \fI.origin\fR statement file.
+.br
+Secret key sources (in priority order):
+.br
+1. \fB$ORIGIN_KEY\fR environment variable
+.br
+2. \fB--key\fR \fIfile\fR
+.br
+3. \fB--key\fR \fI-\fR (read from stdin)
+.TP
+.B verify \fIstatement\fR \fIartifact\fR
+Verify a provenance statement against an artifact.
+Returns VERIFIED or FAILED. Exit code 0 on success, 1 on failure.
+.TP
+.B audit \fIstatement\fR
+Display a human-readable audit of a statement.
+Does NOT perform cryptographic verification.
+.SH OPTIONS
+.TP
+.B \-h, \-\-help
+Print help information.
+.TP
+.B \-V, \-\-version
+Print version information.
+.SH EXAMPLES
+.TP
+Generate a key pair
+origin keygen
+.TP
+Sign a file
+origin sign release.tar.gz \-\-key origin\-secret.key
+.TP
+Verify a signed file
+origin verify release.tar.gz.origin release.tar.gz
+.TP
+Chain a new statement to a parent
+origin sign v2.0.tar.gz \-\-key origin\-secret.key \-\-parent v1.0.tar.gz.origin
+.SH EXIT STATUS
+.TP
+0
+Successful verification.
+.TP
+1
+Verification failure or error.
+.SH SECURITY
+The verifier must obtain the trusted public key through an external
+channel (website, Signal, Keybase, etc.). The protocol does not
+distribute or authenticate public keys.
+.P
+See RFC-0001.md, THREAT_MODEL.md, and TRUST_MODEL.md for the
+full security analysis.
+.SH SEE ALSO
+.IR RFC-0001.md ,
+.IR docs/THREAT_MODEL.md ,
+.IR docs/TRUST_MODEL.md
+.P
+Project page: <https://github.com/thupa-pro/Origin>

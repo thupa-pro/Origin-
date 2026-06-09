@@ -2,7 +2,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build test check clean coverage docs release
+.PHONY: help build test check clean coverage docs man release
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -25,6 +25,10 @@ coverage: ## Generate code coverage report (requires cargo-llvm-cov)
 
 docs: ## Build documentation
 	cargo doc --no-deps --document-private-items
+
+man: ## Install man page
+	cp docs/origin.1 /usr/local/share/man/man1/
+	mandb -q
 
 clean: ## Clean build artifacts
 	cargo clean
