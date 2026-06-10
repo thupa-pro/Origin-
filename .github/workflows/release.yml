@@ -29,6 +29,7 @@ jobs:
   publish-crates-io:
     runs-on: ubuntu-latest
     needs: create-release
+    continue-on-error: true
     steps:
     - uses: actions/checkout@v6
     - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -39,15 +40,58 @@ jobs:
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  build-binaries:
+  build-x86_64-linux:
     runs-on: ubuntu-latest
+    needs: create-release
+    permissions:
+      contents: write
+    env:
+      TARGET: x86_64-unknown-linux-gnu
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        target: x86_64-unknown-linux-gnu
+    - run: cargo build --release --target x86_64-unknown-linux-gnu
+    - name: Sign binary with Origin
+      run: |
+        echo "${{ secrets.ORIGIN_RELEASE_KEY }}" > /tmp/release.key
+        ./target/x86_64-unknown-linux-gnu/release/origin sign \
+          target/x86_64-unknown-linux-gnu/release/origin \
+          --key /tmp/release.key
+        rm -f /tmp/release.key
+      env:
+        ORIGIN_RELEASE_KEY: ${{ secrets.ORIGIN_RELEASE_KEY }}
+    - name: Update release provenance in docs
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git fetch origin main
+        git checkout main
+        cp target/x86_64-unknown-linux-gnu/release/origin.origin docs/origin-linux-x86_64.origin
+        git add docs/origin-linux-x86_64.origin
+        git diff --cached --quiet || git commit -m "ci: update release provenance for ${{ github.ref_name }}"
+        git pull --rebase origin main
+        git push
+    - name: Update v1 tag
+      run: |
+        git tag -f v1
+        git push origin v1 --force
+    - name: Upload binary
+      uses: softprops/action-gh-release@v3
+      with:
+        files: |
+          target/x86_64-unknown-linux-gnu/release/origin
+          target/x86_64-unknown-linux-gnu/release/origin.origin
+
+  build-macos:
+    runs-on: macos-latest
     needs: create-release
     permissions:
       contents: write
     strategy:
       matrix:
         target:
-          - x86_64-unknown-linux-gnu
           - x86_64-apple-darwin
           - aarch64-apple-darwin
     steps:
@@ -56,35 +100,7 @@ jobs:
       with:
         target: ${{ matrix.target }}
     - run: cargo build --release --target ${{ matrix.target }}
-    - name: Sign binary with Origin
-      run: |
-        echo "${{ secrets.ORIGIN_RELEASE_KEY }}" > /tmp/release.key
-        ./target/${{ matrix.target }}/release/origin sign \
-          target/${{ matrix.target }}/release/origin \
-          --key /tmp/release.key
-        rm -f /tmp/release.key
-      env:
-        ORIGIN_RELEASE_KEY: ${{ secrets.ORIGIN_RELEASE_KEY }}
-    - name: Update release provenance in docs (Linux only)
-      if: matrix.target == 'x86_64-unknown-linux-gnu'
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git fetch origin main
-        git checkout main
-        cp target/${{ matrix.target }}/release/origin.origin docs/origin-linux-x86_64.origin
-        git add docs/origin-linux-x86_64.origin
-        git diff --cached --quiet || git commit -m "ci: update release provenance for ${{ github.ref_name }}"
-        git pull --rebase origin main
-        git push
-    - name: Update v1 tag (Linux only)
-      if: matrix.target == 'x86_64-unknown-linux-gnu'
-      run: |
-        git tag -f v1
-        git push origin v1 --force
     - name: Upload binary
       uses: softprops/action-gh-release@v3
       with:
-        files: |
-          target/${{ matrix.target }}/release/origin
-          target/${{ matrix.target }}/release/origin.origin
+        files: target/${{ matrix.target }}/release/origin
