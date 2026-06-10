@@ -43,17 +43,14 @@ pub struct Statement {
 }
 
 fn validate_hash_prefix(s: &str) -> Result<()> {
-    let colon_pos = s.find(':').ok_or_else(|| {
-        Error::Format("hash missing algorithm prefix (e.g., 'sha256:')".into())
-    })?;
+    let colon_pos = s
+        .find(':')
+        .ok_or_else(|| Error::Format("hash missing algorithm prefix (e.g., 'sha256:')".into()))?;
     let alg_str = &s[..colon_pos];
     let hex_val = &s[colon_pos + 1..];
 
     if alg_str != "sha256" {
-        return Err(Error::Format(format!(
-            "unknown hash algorithm '{}'. Allowed: sha256",
-            alg_str
-        )));
+        return Err(Error::Format(format!("unknown hash algorithm '{}'. Allowed: sha256", alg_str)));
     }
 
     let expected_hex_len = 64;
@@ -66,26 +63,21 @@ fn validate_hash_prefix(s: &str) -> Result<()> {
     }
 
     if !hex_val.as_bytes().iter().all(|b| HEX_CHARS.contains(b)) {
-        return Err(Error::Format(
-            "non-hex character or uppercase in hash".into(),
-        ));
+        return Err(Error::Format("non-hex character or uppercase in hash".into()));
     }
 
     Ok(())
 }
 
 fn parse_hash_string(s: &str) -> Result<(String, Vec<u8>)> {
-    let colon_pos = s.find(':').ok_or_else(|| {
-        Error::Format("hash missing algorithm prefix (e.g., 'sha256:')".into())
-    })?;
+    let colon_pos = s
+        .find(':')
+        .ok_or_else(|| Error::Format("hash missing algorithm prefix (e.g., 'sha256:')".into()))?;
     let alg_str = &s[..colon_pos];
     let hex_val = &s[colon_pos + 1..];
 
     if alg_str != "sha256" {
-        return Err(Error::Format(format!(
-            "unknown hash algorithm '{}'. Allowed: sha256",
-            alg_str
-        )));
+        return Err(Error::Format(format!("unknown hash algorithm '{}'. Allowed: sha256", alg_str)));
     }
 
     let expected_hex_len = 64;
@@ -98,13 +90,10 @@ fn parse_hash_string(s: &str) -> Result<(String, Vec<u8>)> {
     }
 
     if !hex_val.as_bytes().iter().all(|b| HEX_CHARS.contains(b)) {
-        return Err(Error::Format(
-            "non-hex character or uppercase in hash".into(),
-        ));
+        return Err(Error::Format("non-hex character or uppercase in hash".into()));
     }
 
-    let bytes = hex::decode(hex_val)
-        .map_err(|_| Error::Format("invalid hex encoding".into()))?;
+    let bytes = hex::decode(hex_val).map_err(|_| Error::Format("invalid hex encoding".into()))?;
 
     Ok((hex_val.to_string(), bytes))
 }
@@ -135,14 +124,9 @@ fn validate_timestamp(value: &str) -> Result<u64> {
     if value.len() > 1 && value.starts_with('0') {
         return Err(Error::Format("timestamp must not have leading zeros".into()));
     }
-    let ts: u64 = value
-        .parse()
-        .map_err(|_| Error::Format("timestamp overflow".into()))?;
+    let ts: u64 = value.parse().map_err(|_| Error::Format("timestamp overflow".into()))?;
     if ts > MAX_TIMESTAMP {
-        return Err(Error::Format(format!(
-            "timestamp {} exceeds maximum {}",
-            ts, MAX_TIMESTAMP
-        )));
+        return Err(Error::Format(format!("timestamp {} exceeds maximum {}", ts, MAX_TIMESTAMP)));
     }
     Ok(ts)
 }
@@ -156,8 +140,7 @@ impl Statement {
     /// This function does NOT perform cryptographic verification.
     /// Use `verify_statement` or `verify_consistency` for that.
     pub fn parse(data: &[u8]) -> Result<Self> {
-        let text = std::str::from_utf8(data)
-            .map_err(|_| Error::Format("not valid UTF-8".into()))?;
+        let text = std::str::from_utf8(data).map_err(|_| Error::Format("not valid UTF-8".into()))?;
 
         if data.starts_with(b"\xef\xbb\xbf") {
             return Err(Error::Format("BOM not allowed".into()));
@@ -176,10 +159,7 @@ impl Statement {
         let lines: Vec<&str> = raw.split('\n').collect();
 
         if lines.len() < 6 || lines.len() > 7 {
-            return Err(Error::Format(format!(
-                "expected 6 or 7 lines, got {}",
-                lines.len()
-            )));
+            return Err(Error::Format(format!("expected 6 or 7 lines, got {}", lines.len())));
         }
 
         for (i, line) in lines.iter().enumerate() {
@@ -201,10 +181,7 @@ impl Statement {
         for (i, line) in lines.iter().enumerate() {
             let sep = ": ";
             let Some(pos) = line.find(sep) else {
-                return Err(Error::Format(format!(
-                    "line {}: missing ': ' separator",
-                    i + 1
-                )));
+                return Err(Error::Format(format!("line {}: missing ': ' separator", i + 1)));
             };
             let key = &line[..pos];
             let value = &line[pos + sep.len()..];
@@ -215,11 +192,7 @@ impl Statement {
             if value.is_empty() {
                 return Err(Error::Format(format!("line {}: empty value", i + 1)));
             }
-            if value.starts_with(' ')
-                || value.starts_with('\t')
-                || value.ends_with(' ')
-                || value.ends_with('\t')
-            {
+            if value.starts_with(' ') || value.starts_with('\t') || value.ends_with(' ') || value.ends_with('\t') {
                 return Err(Error::Format(format!(
                     "line {}: leading or trailing whitespace in value",
                     i + 1
@@ -231,7 +204,8 @@ impl Statement {
                 if cp < 0x20 || cp == 0x7f {
                     return Err(Error::Format(format!(
                         "line {}: control character U+{:04X} in value",
-                        i + 1, cp
+                        i + 1,
+                        cp
                     )));
                 }
             }
@@ -239,7 +213,9 @@ impl Statement {
             if *key != *expected_order[i] {
                 return Err(Error::Format(format!(
                     "line {}: expected key '{}', got '{}'",
-                    i + 1, expected_order[i], key
+                    i + 1,
+                    expected_order[i],
+                    key
                 )));
             }
             if !seen_keys.insert(key) {
@@ -259,10 +235,7 @@ impl Statement {
 
         let type_val = fields[1].1;
         if type_val != STATEMENT_TYPE {
-            return Err(Error::Format(format!(
-                "type must be '{}', got '{}'",
-                STATEMENT_TYPE, type_val
-            )));
+            return Err(Error::Format(format!("type must be '{}', got '{}'", STATEMENT_TYPE, type_val)));
         }
 
         let parent_val = if has_parent {
@@ -383,15 +356,9 @@ pub fn build_statement(
 
     let canonical = if let Some(p) = parent_hash {
         let parent_line = format!("parent: {}", p);
-        format!(
-            "{}\n{}\n{}\n{}\n{}",
-            origin_line, type_line, parent_line, hash_line, key_line
-        )
+        format!("{}\n{}\n{}\n{}\n{}", origin_line, type_line, parent_line, hash_line, key_line)
     } else {
-        format!(
-            "{}\n{}\n{}\n{}",
-            origin_line, type_line, hash_line, key_line
-        )
+        format!("{}\n{}\n{}\n{}", origin_line, type_line, hash_line, key_line)
     };
 
     let sig = crypto::sign(secret, canonical.as_bytes());
@@ -457,10 +424,7 @@ pub fn encode_statement(stmt: &Statement) -> Vec<u8> {
 pub fn verify_statement(stmt: &Statement, artifact_bytes: &[u8]) -> Result<()> {
     let actual_hash_hex = hash::hash_hex(artifact_bytes);
     if actual_hash_hex != stmt.hash_hex {
-        return Err(Error::HashMismatch {
-            expected: stmt.hash_hex.clone(),
-            actual: actual_hash_hex,
-        });
+        return Err(Error::HashMismatch { expected: stmt.hash_hex.clone(), actual: actual_hash_hex });
     }
 
     let public_key = crypto::PublicKey::from_bytes(&stmt.key_bytes)?;
@@ -486,11 +450,7 @@ pub fn verify_statement(stmt: &Statement, artifact_bytes: &[u8]) -> Result<()> {
 /// * `Ok(())` — The statement is valid AND signed by the trusted key
 /// * `Err(Error::KeyMismatch)` — The statement's key doesn't match the trusted key
 /// * `Err(Error)` — Parsing, hash, or signature verification failed
-pub fn verify(
-    statement_bytes: &[u8],
-    artifact_bytes: &[u8],
-    trusted_public_key: &[u8; 32],
-) -> Result<()> {
+pub fn verify(statement_bytes: &[u8], artifact_bytes: &[u8], trusted_public_key: &[u8; 32]) -> Result<()> {
     let stmt = Statement::parse(statement_bytes)?;
     if stmt.key_bytes != *trusted_public_key {
         return Err(Error::KeyMismatch);

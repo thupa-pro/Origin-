@@ -1,13 +1,17 @@
 use clap::{Parser, Subcommand};
 use origin_core::{
-    base64_encode, build_statement, encode_statement, generate_keypair, hash,
-    verify_chain, verify_chain_consistency, SecretKey, Statement,
+    SecretKey, Statement, base64_encode, build_statement, encode_statement, generate_keypair, hash, verify_chain,
+    verify_chain_consistency,
 };
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Parser)]
-#[command(name = "origin", version, about = "Cryptographic provenance for digital artifacts")]
+#[command(
+    name = "origin",
+    version,
+    about = "Cryptographic provenance for digital artifacts"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -123,8 +127,8 @@ fn load_secret_key(key_arg: &Option<String>) -> Result<SecretKey, String> {
                 .map_err(|e| format!("failed to read key from stdin: {}", e))?;
             return decode_secret_key(input.trim());
         }
-        let data = std::fs::read_to_string(key_src)
-            .map_err(|e| format!("failed to read key file '{}': {}", key_src, e))?;
+        let data =
+            std::fs::read_to_string(key_src).map_err(|e| format!("failed to read key file '{}': {}", key_src, e))?;
         return decode_secret_key(data.trim());
     }
 
@@ -147,15 +151,13 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Hash { path } => {
-            match hash::hash_file(&path) {
-                Ok(h) => println!("sha256:{}", h),
-                Err(e) => {
-                    eprintln!("error: {}", e);
-                    std::process::exit(1);
-                }
-            }
-        }
+        Commands::Hash { path } => match hash::hash_file(&path) {
+            Ok(h) => println!("sha256:{}", h),
+            Err(e) => {
+                eprintln!("error: {}", e);
+                std::process::exit(1);
+            },
+        },
         Commands::Keygen { output } => {
             let dir = output.unwrap_or_else(|| PathBuf::from("."));
             let pair = generate_keypair();
@@ -182,22 +184,21 @@ fn main() {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(&sec_path, std::fs::Permissions::from_mode(0o600))
-                    .ok();
+                std::fs::set_permissions(&sec_path, std::fs::Permissions::from_mode(0o600)).ok();
             }
 
             println!("Key pair generated:");
             println!("  Secret: {}", sec_path.display());
             println!("  Public: {}", pub_path.display());
             println!("  Public key: {}", public_b64);
-        }
+        },
         Commands::Sign { path, key, time, parent } => {
             let secret = match load_secret_key(&key) {
                 Ok(k) => k,
                 Err(e) => {
                     eprintln!("error: {}", e);
                     std::process::exit(1);
-                }
+                },
             };
 
             let artifact_data = match std::fs::read(&path) {
@@ -205,7 +206,7 @@ fn main() {
                 Err(e) => {
                     eprintln!("error: cannot read '{}': {}", path.display(), e);
                     std::process::exit(1);
-                }
+                },
             };
 
             let parent_hash = if let Some(parent_path) = &parent {
@@ -214,14 +215,14 @@ fn main() {
                     Err(e) => {
                         eprintln!("error: cannot read parent '{}': {}", parent_path.display(), e);
                         std::process::exit(1);
-                    }
+                    },
                 };
                 let parent_stmt = match Statement::parse(&parent_data) {
                     Ok(s) => s,
                     Err(e) => {
                         eprintln!("error: invalid parent statement: {}", e);
                         std::process::exit(1);
-                    }
+                    },
                 };
                 Some(parent_stmt.hash)
             } else {
@@ -234,7 +235,7 @@ fn main() {
                 Err(e) => {
                     eprintln!("error: {}", e);
                     std::process::exit(1);
-                }
+                },
             };
 
             let encoded = encode_statement(&stmt);
@@ -242,33 +243,27 @@ fn main() {
             match std::fs::write(&stmt_path, &encoded) {
                 Ok(_) => {
                     println!("Statement written to {}", stmt_path.display());
-                }
+                },
                 Err(e) => {
                     eprintln!("error: cannot write statement: {}", e);
                     std::process::exit(1);
-                }
+                },
             }
-        }
-        Commands::Verify {
-            statement,
-            artifact,
-            parent,
-            trusted_key,
-            consistency_only,
-        } => {
+        },
+        Commands::Verify { statement, artifact, parent, trusted_key, consistency_only } => {
             let stmt_data = match std::fs::read(&statement) {
                 Ok(d) => d,
                 Err(e) => {
                     eprintln!("error: cannot read '{}': {}", statement.display(), e);
                     std::process::exit(1);
-                }
+                },
             };
             let art_data = match std::fs::read(&artifact) {
                 Ok(d) => d,
                 Err(e) => {
                     eprintln!("error: cannot read '{}': {}", artifact.display(), e);
                     std::process::exit(1);
-                }
+                },
             };
 
             let (parent_stmt_data, parent_art_data) = if let Some(ref args) = parent {
@@ -281,14 +276,14 @@ fn main() {
                     Err(e) => {
                         eprintln!("error: cannot read parent '{}': {}", args[0].display(), e);
                         std::process::exit(1);
-                    }
+                    },
                 };
                 let pa = match std::fs::read(&args[1]) {
                     Ok(d) => d,
                     Err(e) => {
                         eprintln!("error: cannot read parent artifact '{}': {}", args[1].display(), e);
                         std::process::exit(1);
-                    }
+                    },
                 };
                 (Some(ps), Some(pa))
             } else {
@@ -296,17 +291,14 @@ fn main() {
             };
 
             let result = if consistency_only {
-                verify_chain_consistency(
-                    &stmt_data, &art_data,
-                    parent_stmt_data.as_deref(), parent_art_data.as_deref(),
-                )
+                verify_chain_consistency(&stmt_data, &art_data, parent_stmt_data.as_deref(), parent_art_data.as_deref())
             } else if let Some(ref tk_path) = trusted_key {
                 let tk_data = match std::fs::read_to_string(tk_path) {
                     Ok(d) => d,
                     Err(e) => {
                         eprintln!("error: cannot read trusted key '{}': {}", tk_path.display(), e);
                         std::process::exit(1);
-                    }
+                    },
                 };
                 let trimmed = tk_data.trim().to_string();
                 let decoded = match origin_core::base64url_decode(&trimmed) {
@@ -314,7 +306,7 @@ fn main() {
                     Err(e) => {
                         eprintln!("error: invalid base64url in trusted key: {}", e);
                         std::process::exit(1);
-                    }
+                    },
                 };
                 if decoded.len() != 32 {
                     eprintln!("error: trusted public key must decode to 32 bytes (got {})", decoded.len());
@@ -323,8 +315,10 @@ fn main() {
                 let mut key = [0u8; 32];
                 key.copy_from_slice(&decoded);
                 verify_chain(
-                    &stmt_data, &art_data,
-                    parent_stmt_data.as_deref(), parent_art_data.as_deref(),
+                    &stmt_data,
+                    &art_data,
+                    parent_stmt_data.as_deref(),
+                    parent_art_data.as_deref(),
                     &key,
                 )
             } else {
@@ -337,27 +331,27 @@ fn main() {
                 Err(e) => {
                     println!("FAILED: {}", e);
                     std::process::exit(1);
-                }
+                },
             }
-        }
+        },
         Commands::Audit { statement } => {
             let stmt_data = match std::fs::read(&statement) {
                 Ok(d) => d,
                 Err(e) => {
                     eprintln!("error: cannot read '{}': {}", statement.display(), e);
                     std::process::exit(1);
-                }
+                },
             };
 
             match Statement::parse(&stmt_data) {
                 Ok(stmt) => {
                     println!("{}", origin_core::audit::audit(&stmt));
-                }
+                },
                 Err(e) => {
                     eprintln!("error: cannot parse statement: {}", e);
                     std::process::exit(1);
-                }
+                },
             }
-        }
+        },
     }
 }

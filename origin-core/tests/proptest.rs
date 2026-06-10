@@ -1,7 +1,6 @@
 use origin_core::{
-    build_statement, encode_statement, generate_keypair_from_seed,
-    verify, verify_consistency, verify_chain, verify_chain_consistency,
-    SecretKey,
+    SecretKey, build_statement, encode_statement, generate_keypair_from_seed, verify, verify_chain,
+    verify_chain_consistency, verify_consistency,
 };
 use proptest::prelude::*;
 use test_strategy::proptest;
@@ -15,14 +14,11 @@ fn arb_timestamp() -> impl Strategy<Value = u64> {
 }
 
 fn arb_parent_hash() -> impl Strategy<Value = Option<String>> {
-    prop::option::of(
-        "[a-f0-9]{64}".prop_map(|hex| format!("sha256:{}", hex)).no_shrink(),
-    )
+    prop::option::of("[a-f0-9]{64}".prop_map(|hex| format!("sha256:{}", hex)).no_shrink())
 }
 
 fn arb_secret() -> impl Strategy<Value = SecretKey> {
-    any::<[u8; 32]>()
-        .prop_map(|seed| SecretKey::from_bytes(&seed).unwrap())
+    any::<[u8; 32]>().prop_map(|seed| SecretKey::from_bytes(&seed).unwrap())
 }
 
 #[proptest]
@@ -112,12 +108,8 @@ fn verify_chain_roundtrip(
     let p_enc = encode_statement(&parent);
     let child = build_statement(&secret, &child_art, child_ts, Some(&parent.hash)).unwrap();
     let c_enc = encode_statement(&child);
-    prop_assert!(verify_chain(
-        &c_enc, &child_art, Some(&p_enc), Some(&parent_art), &trusted
-    ).is_ok());
-    prop_assert!(verify_chain_consistency(
-        &c_enc, &child_art, Some(&p_enc), Some(&parent_art)
-    ).is_ok());
+    prop_assert!(verify_chain(&c_enc, &child_art, Some(&p_enc), Some(&parent_art), &trusted).is_ok());
+    prop_assert!(verify_chain_consistency(&c_enc, &child_art, Some(&p_enc), Some(&parent_art)).is_ok());
 }
 
 #[proptest]

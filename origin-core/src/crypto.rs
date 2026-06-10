@@ -31,9 +31,7 @@ impl SecretKey {
     /// Create a SecretKey from a 32-byte slice. Returns an error if length != 32.
     pub fn from_bytes(bytes: &[u8]) -> crate::error::Result<Self> {
         if bytes.len() != 32 {
-            return Err(crate::error::Error::Crypto(
-                "secret key must be 32 bytes".into(),
-            ));
+            return Err(crate::error::Error::Crypto("secret key must be 32 bytes".into()));
         }
         let mut key = [0u8; 32];
         key.copy_from_slice(bytes);
@@ -45,9 +43,7 @@ impl PublicKey {
     /// Create a PublicKey from a 32-byte slice. Returns an error if length != 32.
     pub fn from_bytes(bytes: &[u8]) -> crate::error::Result<Self> {
         if bytes.len() != 32 {
-            return Err(crate::error::Error::Crypto(
-                "public key must be 32 bytes".into(),
-            ));
+            return Err(crate::error::Error::Crypto("public key must be 32 bytes".into()));
         }
         let mut key = [0u8; 32];
         key.copy_from_slice(bytes);
@@ -64,9 +60,7 @@ impl Signature {
     /// Create a Signature from a 64-byte slice. Returns an error if length != 64.
     pub fn from_bytes(bytes: &[u8]) -> crate::error::Result<Self> {
         if bytes.len() != 64 {
-            return Err(crate::error::Error::Crypto(
-                "signature must be 64 bytes".into(),
-            ));
+            return Err(crate::error::Error::Crypto("signature must be 64 bytes".into()));
         }
         let mut sig = [0u8; 64];
         sig.copy_from_slice(bytes);
@@ -77,8 +71,8 @@ impl Signature {
 /// Generate a new Ed25519 keypair using OS entropy.
 pub fn generate_keypair() -> Keypair {
     let mut seed = [0u8; 32];
-    use rand::rngs::OsRng;
     use rand::TryRngCore;
+    use rand::rngs::OsRng;
     OsRng.try_fill_bytes(&mut seed).expect("OsRng failure");
     generate_keypair_from_seed(&seed)
 }
@@ -87,10 +81,7 @@ pub fn generate_keypair() -> Keypair {
 pub fn generate_keypair_from_seed(seed: &[u8; 32]) -> Keypair {
     let dalek_pair = ed25519_dalek::SigningKey::from_bytes(seed);
     let public = dalek_pair.verifying_key();
-    Keypair {
-        secret: SecretKey(*seed),
-        public: PublicKey(public.to_bytes()),
-    }
+    Keypair { secret: SecretKey(*seed), public: PublicKey(public.to_bytes()) }
 }
 
 /// Sign a message with an Ed25519 secret key.
@@ -104,14 +95,10 @@ pub fn sign(secret: &SecretKey, message: &[u8]) -> Signature {
 }
 
 /// Verify an Ed25519 signature on a message.
-pub fn verify(
-    public: &PublicKey,
-    message: &[u8],
-    sig: &Signature,
-) -> crate::error::Result<()> {
+pub fn verify(public: &PublicKey, message: &[u8], sig: &Signature) -> crate::error::Result<()> {
     use ed25519_dalek::Verifier as _;
-    let dalek_pub = ed25519_dalek::VerifyingKey::from_bytes(&public.0)
-        .map_err(|e| crate::error::Error::Crypto(e.to_string()))?;
+    let dalek_pub =
+        ed25519_dalek::VerifyingKey::from_bytes(&public.0).map_err(|e| crate::error::Error::Crypto(e.to_string()))?;
     let dalek_sig = ed25519_dalek::ed25519::Signature::from_bytes(&sig.0);
     dalek_pub
         .verify(message, &dalek_sig)

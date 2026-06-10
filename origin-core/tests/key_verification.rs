@@ -1,7 +1,4 @@
-use origin_core::{
-    build_statement, encode_statement, generate_keypair_from_seed,
-    verify, verify_chain, SecretKey,
-};
+use origin_core::{SecretKey, build_statement, encode_statement, generate_keypair_from_seed, verify, verify_chain};
 
 fn make_secret(seed_byte: u8) -> SecretKey {
     let seed = [seed_byte; 32];
@@ -52,11 +49,7 @@ fn test_verify_chain_correct() {
     let child = build_statement(&secret, child_art, 200, Some(&parent.hash)).unwrap();
     let child_enc = encode_statement(&child);
 
-    let result = verify_chain(
-        &child_enc, child_art,
-        Some(&parent_enc), Some(parent_art),
-        &tk,
-    );
+    let result = verify_chain(&child_enc, child_art, Some(&parent_enc), Some(parent_art), &tk);
     assert!(result.is_ok(), "chain with correct key must verify: {:?}", result);
 }
 
@@ -74,11 +67,7 @@ fn test_verify_chain_wrong_child_key() {
     let child = build_statement(&secret_child, child_art, 200, Some(&parent.hash)).unwrap();
     let child_enc = encode_statement(&child);
 
-    let result = verify_chain(
-        &child_enc, child_art,
-        Some(&parent_enc), Some(parent_art),
-        &tk,
-    );
+    let result = verify_chain(&child_enc, child_art, Some(&parent_enc), Some(parent_art), &tk);
     assert!(result.is_err(), "child with different key must fail");
     let err = format!("{}", result.unwrap_err());
     assert!(err.contains("Public key mismatch"), "error must mention key mismatch: {}", err);
@@ -98,11 +87,7 @@ fn test_verify_chain_wrong_parent_key() {
     let child = build_statement(&secret_child, child_art, 200, Some(&parent.hash)).unwrap();
     let child_enc = encode_statement(&child);
 
-    let result = verify_chain(
-        &child_enc, child_art,
-        Some(&parent_enc), Some(parent_art),
-        &tk,
-    );
+    let result = verify_chain(&child_enc, child_art, Some(&parent_enc), Some(parent_art), &tk);
     assert!(result.is_err(), "parent with different key must fail: {:?}", result);
     let err = format!("{}", result.unwrap_err());
     assert!(err.contains("Public key mismatch"), "error must mention key mismatch: {}", err);

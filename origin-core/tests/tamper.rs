@@ -1,4 +1,4 @@
-use origin_core::{build_statement, encode_statement, SecretKey};
+use origin_core::{SecretKey, build_statement, encode_statement};
 
 fn make_test_statement() -> (Vec<u8>, Vec<u8>) {
     let seed = [42u8; 32];
@@ -15,8 +15,13 @@ fn make_test_statement_with_parent() -> (Vec<u8>, Vec<u8>) {
     let secret = SecretKey::from_bytes(&seed).unwrap();
     let data = b"tamper test artifact";
     let ts = 1717776000;
-    let stmt = build_statement(&secret, data, ts,
-        Some("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")).unwrap();
+    let stmt = build_statement(
+        &secret,
+        data,
+        ts,
+        Some("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+    )
+    .unwrap();
     let encoded = encode_statement(&stmt);
     (encoded, data.to_vec())
 }
@@ -52,7 +57,10 @@ fn test_tamper_timestamp_advisory() {
     let text = String::from_utf8(stmt).unwrap();
     let tampered = text.replace("time: 1717776000", "time: 1717776001");
     let result = origin_core::verify_consistency(tampered.as_bytes(), &art);
-    assert!(result.is_ok(), "timestamp is advisory — changing it must NOT break verification");
+    assert!(
+        result.is_ok(),
+        "timestamp is advisory — changing it must NOT break verification"
+    );
 }
 
 /// Tamper with the public key — must fail verification.
@@ -60,10 +68,7 @@ fn test_tamper_timestamp_advisory() {
 fn test_tamper_pubkey() {
     let (stmt, art) = make_test_statement();
     let text = String::from_utf8(stmt).unwrap();
-    let tampered = text.replace(
-        &text.lines().nth(4).unwrap()[..10],
-        "AAAAAAAAAA",
-    );
+    let tampered = text.replace(&text.lines().nth(4).unwrap()[..10], "AAAAAAAAAA");
     let result = origin_core::verify_consistency(tampered.as_bytes(), &art);
     assert!(result.is_err(), "tampered pubkey must fail verification");
 }
@@ -107,7 +112,10 @@ fn test_empty_artifact() {
     let result = origin_core::verify_consistency(&enc, b"");
     assert!(result.is_ok(), "empty artifact must verify correctly");
     let result2 = origin_core::verify_consistency(&enc, b"x");
-    assert!(result2.is_err(), "non-empty artifact must fail against empty-artifact statement");
+    assert!(
+        result2.is_err(),
+        "non-empty artifact must fail against empty-artifact statement"
+    );
 }
 
 /// Reorder lines in the statement.

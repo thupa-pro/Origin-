@@ -1,4 +1,4 @@
-use origin_core::{base64_encode, crypto, generate_keypair_from_seed, hash, SecretKey};
+use origin_core::{SecretKey, base64_encode, crypto, generate_keypair_from_seed, hash};
 
 fn make_secret(seed_byte: u8) -> SecretKey {
     SecretKey::from_bytes(&[seed_byte; 32]).unwrap()

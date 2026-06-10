@@ -36,12 +36,11 @@ pub mod error;
 pub mod hash;
 pub mod statement;
 
-pub use crypto::{generate_keypair, generate_keypair_from_seed, Keypair, PublicKey, SecretKey, Signature};
+pub use crypto::{Keypair, PublicKey, SecretKey, Signature, generate_keypair, generate_keypair_from_seed};
 pub use error::{Error, Result};
 pub use hash::hash_bytes;
 pub use statement::{
-    build_statement, encode_statement, verify_statement,
-    verify, verify_chain, verify_chain_consistency, Statement,
+    Statement, build_statement, encode_statement, verify, verify_chain, verify_chain_consistency, verify_statement,
 };
 
 /// Convenience type alias for verification results.

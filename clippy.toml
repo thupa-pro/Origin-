@@ -3,8 +3,7 @@
 # Disable: unwrap_used, expect_used, panic
 
 # Style
-cognitive-complexity = 25
-cyclomatic-complexity = 30
+# (complexity limits removed — use defaults)
 
 # Restrict certain patterns
 # unrestrictive-result-clone: allow

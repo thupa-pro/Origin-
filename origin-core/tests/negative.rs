@@ -66,12 +66,18 @@ fn test_bom() {
 
 #[test]
 fn test_cr() {
-    assert_parse_fails(b"origin: v1\ntype: provenance\nhash: abc\ntime: 0\nkey: aaaaa\nsig: aaaaa\n", "CR character");
+    assert_parse_fails(
+        b"origin: v1\ntype: provenance\nhash: abc\ntime: 0\nkey: aaaaa\nsig: aaaaa\n",
+        "CR character",
+    );
 }
 
 #[test]
 fn test_null_byte() {
-    assert_parse_fails(b"origin: v1\ntype: provenance\nhash: a\ntime: 0\nkey: aaaaa\nsig: a\x00aaaa\n", "null byte");
+    assert_parse_fails(
+        b"origin: v1\ntype: provenance\nhash: a\ntime: 0\nkey: aaaaa\nsig: a\x00aaaa\n",
+        "null byte",
+    );
 }
 
 // ── Key validation ──
@@ -144,16 +150,14 @@ fn test_hash_uppercase() {
 fn test_hash_too_short() {
     let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
-    let tampered = text.replace(
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "abc",
-    );
+    let tampered = text.replace("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "abc");
     assert_parse_fails(tampered.as_bytes(), "hash too short");
 }
 
 #[test]
 fn test_hash_alg_unknown() {
-    let data = b"origin: v1\ntype: provenance\nhash: md5:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ntime: 0\nkey: xxxxx\nsig: xxxxx\n";
+    let data =
+        b"origin: v1\ntype: provenance\nhash: md5:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ntime: 0\nkey: xxxxx\nsig: xxxxx\n";
     assert_parse_fails(data, "unknown hash algorithm");
     let err = format!("{}", Statement::parse(data).unwrap_err());
     assert!(err.contains("sha256"), "error must mention 'sha256': {}", err);
@@ -187,10 +191,7 @@ fn test_timestamp_overflow() {
 fn test_key_wrong_length() {
     let v = valid_statement();
     let text = String::from_utf8(v).unwrap();
-    let tampered = text.replace(
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-        "tooshort",
-    );
+    let tampered = text.replace("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "tooshort");
     assert_parse_fails(tampered.as_bytes(), "key too short");
 }
 
@@ -222,10 +223,7 @@ fn test_key_decoded_length_mismatch() {
     let text = String::from_utf8(v).unwrap();
     let unpadded_44 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     assert_eq!(unpadded_44.len(), 44, "test input must be 44 chars");
-    let tampered = text.replace(
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-        unpadded_44,
-    );
+    let tampered = text.replace("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", unpadded_44);
     assert_parse_fails(tampered.as_bytes(), "decoded key length mismatch");
 }
 
@@ -259,8 +257,8 @@ fn test_tab_in_value() {
     assert_parse_fails(data, "tab in value");
 }
 
-use origin_core::{build_statement, encode_statement, verify_chain_consistency};
 use origin_core::SecretKey;
+use origin_core::{build_statement, encode_statement, verify_chain_consistency};
 
 #[test]
 fn test_verify_missing_parent() {
@@ -296,5 +294,9 @@ fn test_verify_wrong_parent() {
     let result = verify_chain_consistency(&child_encoded, child_artifact, Some(&parent_encoded), Some(parent_artifact));
     assert!(result.is_err(), "must fail when parent hash doesn't match");
     let err = format!("{}", result.unwrap_err());
-    assert!(err.contains("Parent hash mismatch"), "error must indicate hash mismatch: {}", err);
+    assert!(
+        err.contains("Parent hash mismatch"),
+        "error must indicate hash mismatch: {}",
+        err
+    );
 }

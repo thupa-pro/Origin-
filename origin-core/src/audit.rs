@@ -20,10 +20,7 @@ fn timestamp_to_iso8601(ts: u64) -> String {
     let mi = (day_secs % 3600) / 60;
     let s = day_secs % 60;
 
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        y, m, d, h, mi, s
-    )
+    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, m, d, h, mi, s)
 }
 
 /// Produce a human-readable audit report of a provenance statement.
@@ -41,13 +38,7 @@ pub fn audit(statement: &Statement) -> String {
          ├─ Time:    {} ({}) — advisory\n\
          ├─ Key:     {}\n\
          └─ Sig:     {}",
-        statement.origin,
-        parent_line,
-        statement.hash,
-        iso,
-        statement.time,
-        statement.key_b64,
-        statement.sig_b64,
+        statement.origin, parent_line, statement.hash, iso, statement.time, statement.key_b64, statement.sig_b64,
     )
 }
 

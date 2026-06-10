@@ -1,6 +1,4 @@
-use origin_core::{
-    base64_encode, build_statement, verify_consistency, Statement,
-};
+use origin_core::{Statement, base64_encode, build_statement, verify_consistency};
 
 /// Timestamp is now advisory — changing it does NOT break verification.
 #[test]
@@ -18,7 +16,10 @@ fn test_timestamp_advisory() {
     let text = String::from_utf8(encoded).unwrap();
     let tampered = text.replace("time: 1717776000", "time: 1717776001");
     let result = verify_consistency(tampered.as_bytes(), data);
-    assert!(result.is_ok(), "timestamp is advisory — changing it must NOT break verification");
+    assert!(
+        result.is_ok(),
+        "timestamp is advisory — changing it must NOT break verification"
+    );
 }
 
 /// Changing origin still breaks verification (signed field).
@@ -104,7 +105,7 @@ fn test_pubkey_swap_attack() {
 /// Oversized statement.
 #[test]
 fn test_oversized_statement() {
-    let large_key = vec!['A' as u8; 1000];
+    let large_key = vec![b'A'; 1000];
     let mut content = b"origin: v1\ntype: provenance\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: ".to_vec();
     content.extend_from_slice(&large_key);
     content.extend_from_slice(b"\nsig: ");
@@ -181,8 +182,13 @@ fn test_canonical_body_integrity_with_parent() {
     let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
     let data = b"artifact";
 
-    let stmt = build_statement(&secret, data, 100,
-        Some("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")).unwrap();
+    let stmt = build_statement(
+        &secret,
+        data,
+        100,
+        Some("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+    )
+    .unwrap();
     let encoded = origin_core::encode_statement(&stmt);
 
     let text = String::from_utf8(encoded).unwrap();
@@ -204,8 +210,13 @@ fn test_parent_tamper_attack() {
     let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
     let data = b"child";
 
-    let stmt = build_statement(&secret, data, 100,
-        Some("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")).unwrap();
+    let stmt = build_statement(
+        &secret,
+        data,
+        100,
+        Some("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+    )
+    .unwrap();
     let encoded = origin_core::encode_statement(&stmt);
 
     let text = String::from_utf8(encoded).unwrap();
