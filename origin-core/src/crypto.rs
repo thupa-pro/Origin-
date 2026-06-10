@@ -104,3 +104,32 @@ pub fn verify(public: &PublicKey, message: &[u8], sig: &Signature) -> crate::err
         .verify(message, &dalek_sig)
         .map_err(|e| crate::error::Error::Crypto(e.to_string()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_secret_key_wrong_length() {
+        let err = SecretKey::from_bytes(&[0u8; 31]).unwrap_err();
+        assert!(err.to_string().contains("32 bytes"));
+        let err = SecretKey::from_bytes(&[0u8; 33]).unwrap_err();
+        assert!(err.to_string().contains("32 bytes"));
+    }
+
+    #[test]
+    fn test_public_key_wrong_length() {
+        let err = PublicKey::from_bytes(&[0u8; 31]).unwrap_err();
+        assert!(err.to_string().contains("32 bytes"));
+        let err = PublicKey::from_bytes(&[0u8; 33]).unwrap_err();
+        assert!(err.to_string().contains("32 bytes"));
+    }
+
+    #[test]
+    fn test_signature_wrong_length() {
+        let err = Signature::from_bytes(&[0u8; 63]).unwrap_err();
+        assert!(err.to_string().contains("64 bytes"));
+        let err = Signature::from_bytes(&[0u8; 65]).unwrap_err();
+        assert!(err.to_string().contains("64 bytes"));
+    }
+}

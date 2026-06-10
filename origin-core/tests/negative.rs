@@ -258,7 +258,7 @@ fn test_tab_in_value() {
 }
 
 use origin_core::SecretKey;
-use origin_core::{build_statement, encode_statement, verify_chain_consistency};
+use origin_core::{build_statement, encode_statement, verify_chain, verify_chain_consistency, verify_consistency};
 
 #[test]
 fn test_verify_missing_parent() {
@@ -274,6 +274,51 @@ fn test_verify_missing_parent() {
     assert!(result.is_err(), "must fail when parent is missing");
     let err = format!("{}", result.unwrap_err());
     assert!(err.contains("parent"), "error must mention parent: {}", err);
+}
+
+#[test]
+fn test_verify_chain_missing_parent_with_key() {
+    let seed = [42u8; 32];
+    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let tk = origin_core::generate_keypair_from_seed(&seed).public.0;
+    let child_artifact = b"child with parent ref";
+
+    let parent_hash = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
+    let child = build_statement(&secret, child_artifact, 100, Some(parent_hash)).unwrap();
+    let child_encoded = encode_statement(&child);
+
+    let result = verify_chain(&child_encoded, child_artifact, None, None, &tk);
+    assert!(result.is_err(), "must fail when parent is missing in verify_chain");
+}
+
+#[test]
+fn test_empty_key_field() {
+    let data = b"origin: v1\ntype: provenance\nhash: sha256:abc\ntime: 0\nkey: \nsig: xxxx\n";
+    assert_parse_fails(data, "empty key field");
+}
+
+#[test]
+fn test_hash_no_colon() {
+    let data = b"origin: v1\ntype: provenance\nhash: sha256abc\ntime: 0\nkey: xxxx\nsig: xxxx\n";
+    assert_parse_fails(data, "hash no colon");
+}
+
+#[test]
+fn test_artifact_too_large() {
+    let data = vec![0u8; 3_000_000_000];
+    let result = verify_consistency(b"origin: v1\n", &data);
+    assert!(result.is_err(), "oversized artifact must fail");
+    let err = format!("{}", result.unwrap_err());
+    assert!(err.contains("too large"), "must mention size: {}", err);
+}
+
+#[test]
+fn test_build_statement_artifact_too_large() {
+    let seed = [42u8; 32];
+    let secret = SecretKey::from_bytes(&seed).unwrap();
+    let data = vec![0u8; 3_000_000_000];
+    let result = build_statement(&secret, &data, 0, None);
+    assert!(result.is_err(), "oversized artifact in build must fail");
 }
 
 #[test]

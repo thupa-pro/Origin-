@@ -22,3 +22,14 @@ pub fn hash_file(path: &std::path::Path) -> Result<String> {
     let data = std::fs::read(path)?;
     Ok(hash_hex(&data))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hash_file_not_found() {
+        let err = hash_file(std::path::Path::new("/nonexistent/file.bin")).unwrap_err();
+        assert!(err.to_string().contains("I/O error"));
+    }
+}

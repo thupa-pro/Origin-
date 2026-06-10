@@ -54,11 +54,31 @@ pub fn audit_with_verdict(statement: &Statement, verify_result: &crate::error::R
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Error;
 
     #[test]
     fn test_timestamp_conversion() {
         assert_eq!(timestamp_to_iso8601(0), "1970-01-01T00:00:00Z");
         assert_eq!(timestamp_to_iso8601(1717776000), "2024-06-07T16:00:00Z");
         assert_eq!(timestamp_to_iso8601(1700000000), "2023-11-14T22:13:20Z");
+    }
+
+    #[test]
+    fn test_audit_with_verdict_ok() {
+        let s = crate::statement::Statement::parse(
+            b"origin: v1\ntype: provenance\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n"
+        ).unwrap();
+        let result = audit_with_verdict(&s, &Ok(()));
+        assert!(result.contains("VERIFIED"));
+    }
+
+    #[test]
+    fn test_audit_with_verdict_err() {
+        let s = crate::statement::Statement::parse(
+            b"origin: v1\ntype: provenance\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n"
+        ).unwrap();
+        let result = audit_with_verdict(&s, &Err(Error::KeyMismatch));
+        assert!(result.contains("FAILED"));
+        assert!(result.contains("key mismatch"));
     }
 }
