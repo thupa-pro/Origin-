@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.2.0 — 2026-06-10
+
+- **Version bumped to 1.2.0** (breaking: hash agility removed, public API renamed)
+- **Simplified to SHA-256 only**: removed hash algorithm enum (`HashAlgorithm`), removed `hash_sha256()`, `build_statement_with_algorithm()`, eliminated all hash-agility branching
+- **Renamed public APIs**: `verify_bytes()` → `verify()`, `verify_chain()` → `verify_chain_consistency()`, `HashAlgorithm` removed entirely
+- **CLI**: `--trusted-key` and `--consistency-only` flags for `verify` command
+- **Property-based tests**: 8 proptest properties × 512 cases each covering parse/verify roundtrips (87 total tests)
+- **Coverage**: 87.20% line coverage (core library), 91.97% (statement.rs)
+- **Fuzz**: 4 targets (parse, verify, verify_key, verify_chain), zero crashes over 120s each
+- **Docs**: All documentation updated to reflect SHA-256-only API
+
 ## v1.1.1 — 2026-06-09
 
 - Fuzz testing: cargo-fuzz targets for parser and verify functions

@@ -21,31 +21,29 @@ fuzz_target!(|data: &[u8]| {
 
     let (stmt_bytes, art_bytes) = test_data();
 
-    // Use first byte to select operation, remaining bytes for mutation data
     let op = data[0] % 6;
 
     match op {
-        // Mutate statement bytes (exercises parse + hash compare + sig verify)
         0 | 1 | 2 => {
             let mut mutated = stmt_bytes.clone();
             let pos = (data[1] as usize) % mutated.len();
             mutated[pos] ^= data[2] ^ data[3];
-            let _ = origin_core::verify_bytes(&mutated, art_bytes);
+            let _ = origin_core::verify_consistency(&mutated, art_bytes);
         }
-        // Mutate artifact bytes (exercises hash compare)
         3 | 4 => {
             let mut mutated = art_bytes.clone();
             let pos = (data[1] as usize) % mutated.len();
             mutated[pos] ^= data[2] ^ data[3];
-            let _ = origin_core::verify_bytes(stmt_bytes, &mutated);
+            let _ = origin_core::verify_consistency(stmt_bytes, &mutated);
         }
-        // Mutate both statement and artifact (exercises full path)
         5 => {
             let mut s = stmt_bytes.clone();
             let mut a = art_bytes.clone();
-            s[(data[1] as usize) % s.len()] ^= data[2];
-            a[(data[3] as usize) % a.len()] ^= data[2];
-            let _ = origin_core::verify_bytes(&s, &a);
+            let s_len = s.len();
+            let a_len = a.len();
+            s[(data[1] as usize) % s_len] ^= data[2];
+            a[(data[3] as usize) % a_len] ^= data[2];
+            let _ = origin_core::verify_consistency(&s, &a);
         }
         _ => {}
     }

@@ -16,7 +16,7 @@ impl Drop for Keypair {
 /// An Ed25519 secret key (32 bytes, the seed per RFC 8032).
 ///
 /// The memory is zeroed on drop via `ZeroizeOnDrop`.
-#[derive(Clone, ZeroizeOnDrop)]
+#[derive(Clone, Debug, ZeroizeOnDrop)]
 pub struct SecretKey(pub [u8; 32]);
 
 /// An Ed25519 public key (32 bytes).

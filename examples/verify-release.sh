@@ -33,9 +33,9 @@ if [ ! -f "$KEY" ]; then
     echo ""
     echo "For now, verifying with the key embedded in the statement..."
     grep '^key: ' "$STATEMENT" | sed 's/^key: //' > /tmp/origin-verify-key.$$
-    origin verify "$STATEMENT" "$ARTIFACT" 2>&1 || true
+    origin verify "$STATEMENT" "$ARTIFACT" --consistency-only 2>&1 || true
     rm -f /tmp/origin-verify-key.$$
     exit 1
 fi
 
-origin verify "$STATEMENT" "$ARTIFACT"
+origin verify "$STATEMENT" "$ARTIFACT" --trusted-key "$KEY"

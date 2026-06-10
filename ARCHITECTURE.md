@@ -8,13 +8,13 @@ Origin is a minimal digital provenance protocol. The entire system is two Rust c
 origin/
 ├── origin-core/          # Library crate — protocol logic
 │   ├── src/
-│   │   ├── lib.rs        # Public API, re-exports, verify_bytes()
+│   │   ├── lib.rs        # Public API, re-exports, verify_consistency()
 │   │   ├── statement.rs  # Parser, canonical body, sign/verify
 │   │   ├── crypto.rs     # Ed25519 key types, sign, verify, generate
-│   │   ├── hash.rs       # SHA-256/384/512 hashing
+│   │   ├── hash.rs       # SHA-256 hashing (hash_bytes, hash_hex, hash_file)
 │   │   ├── error.rs      # Error types (Format, Crypto, HashMismatch, Io)
 │   │   └── audit.rs      # Human-readable statement dump
-│   └── tests/            # 66 integration tests
+│   └── tests/            # 87 integration + proptest
 │       ├── deterministic.rs  # Determinism guarantees
 │       ├── adversarial.rs    # Attack scenarios
 │       ├── negative.rs       # Malformed input parsing

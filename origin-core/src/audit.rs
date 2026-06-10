@@ -26,14 +26,6 @@ fn timestamp_to_iso8601(ts: u64) -> String {
     )
 }
 
-fn format_hash_alg(alg: &crate::hash::HashAlgorithm) -> &'static str {
-    match alg {
-        crate::hash::HashAlgorithm::Sha256 => "SHA-256",
-        crate::hash::HashAlgorithm::Sha384 => "SHA-384",
-        crate::hash::HashAlgorithm::Sha512 => "SHA-512",
-    }
-}
-
 /// Produce a human-readable audit report of a provenance statement.
 pub fn audit(statement: &Statement) -> String {
     let iso = timestamp_to_iso8601(statement.time);
@@ -45,14 +37,13 @@ pub fn audit(statement: &Statement) -> String {
     format!(
         "Statement Audit\n\
          ├─ Origin:  {}\n\
-         {}├─ Hash:    {} ({})\n\
+         {}├─ Hash:    {} (SHA-256)\n\
          ├─ Time:    {} ({}) — advisory\n\
          ├─ Key:     {}\n\
          └─ Sig:     {}",
         statement.origin,
         parent_line,
         statement.hash,
-        format_hash_alg(&statement.hash_alg),
         iso,
         statement.time,
         statement.key_b64,

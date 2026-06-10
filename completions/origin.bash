@@ -45,7 +45,7 @@ _origin() {
             return 0
             ;;
         origin__verify)
-            opts="-h --help <statement> <artifact>"
+            opts="-h --help --trusted-key --consistency-only --parent <statement> <artifact>"
             COMPREPLY=($(compgen -W "${opts}" -- "${cur}"))
             [[ ${COMPREPLY} == "" ]] && COMPREPLY=($(compgen -f -- "${cur}"))
             return 0

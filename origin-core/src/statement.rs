@@ -1,6 +1,6 @@
 use crate::crypto;
 use crate::error::{Error, Result};
-use crate::hash::{self, HashAlgorithm, ALLOWED_HASH_ALGORITHMS};
+use crate::hash;
 
 const PROTOCOL_VERSION: &str = "v1";
 const STATEMENT_TYPE: &str = "provenance";
@@ -26,8 +26,6 @@ pub struct Statement {
     pub hash: String,
     /// Hash digest as lowercase hex (without algorithm prefix).
     pub hash_hex: String,
-    /// Hash algorithm (SHA-256, SHA-384, or SHA-512).
-    pub hash_alg: HashAlgorithm,
     /// Hash digest as raw bytes.
     pub hash_bytes: Vec<u8>,
     /// Self-asserted UNIX timestamp (advisory — not in canonical body).
@@ -44,55 +42,60 @@ pub struct Statement {
     parent_present: bool,
 }
 
-fn parse_hash_string(s: &str) -> Result<(HashAlgorithm, String, Vec<u8>)> {
+fn validate_hash_prefix(s: &str) -> Result<()> {
     let colon_pos = s.find(':').ok_or_else(|| {
         Error::Format("hash missing algorithm prefix (e.g., 'sha256:')".into())
     })?;
     let alg_str = &s[..colon_pos];
     let hex_val = &s[colon_pos + 1..];
 
-    let alg = match alg_str {
-        "sha256" => {
-            let expected_hex_len = 64;
-            if hex_val.len() != expected_hex_len {
-                return Err(Error::Format(format!(
-                    "sha256 hex length {} (expected {})",
-                    hex_val.len(),
-                    expected_hex_len
-                )));
-            }
-            HashAlgorithm::Sha256
-        }
-        "sha384" => {
-            let expected_hex_len = 96;
-            if hex_val.len() != expected_hex_len {
-                return Err(Error::Format(format!(
-                    "sha384 hex length {} (expected {})",
-                    hex_val.len(),
-                    expected_hex_len
-                )));
-            }
-            HashAlgorithm::Sha384
-        }
-        "sha512" => {
-            let expected_hex_len = 128;
-            if hex_val.len() != expected_hex_len {
-                return Err(Error::Format(format!(
-                    "sha512 hex length {} (expected {})",
-                    hex_val.len(),
-                    expected_hex_len
-                )));
-            }
-            HashAlgorithm::Sha512
-        }
-        _ => {
-            return Err(Error::Format(format!(
-                "unknown hash algorithm '{}'. Allowed: {}",
-                alg_str,
-                ALLOWED_HASH_ALGORITHMS.join(", ")
-            )));
-        }
-    };
+    if alg_str != "sha256" {
+        return Err(Error::Format(format!(
+            "unknown hash algorithm '{}'. Allowed: sha256",
+            alg_str
+        )));
+    }
+
+    let expected_hex_len = 64;
+    if hex_val.len() != expected_hex_len {
+        return Err(Error::Format(format!(
+            "sha256 hex length {} (expected {})",
+            hex_val.len(),
+            expected_hex_len
+        )));
+    }
+
+    if !hex_val.as_bytes().iter().all(|b| HEX_CHARS.contains(b)) {
+        return Err(Error::Format(
+            "non-hex character or uppercase in hash".into(),
+        ));
+    }
+
+    Ok(())
+}
+
+fn parse_hash_string(s: &str) -> Result<(String, Vec<u8>)> {
+    let colon_pos = s.find(':').ok_or_else(|| {
+        Error::Format("hash missing algorithm prefix (e.g., 'sha256:')".into())
+    })?;
+    let alg_str = &s[..colon_pos];
+    let hex_val = &s[colon_pos + 1..];
+
+    if alg_str != "sha256" {
+        return Err(Error::Format(format!(
+            "unknown hash algorithm '{}'. Allowed: sha256",
+            alg_str
+        )));
+    }
+
+    let expected_hex_len = 64;
+    if hex_val.len() != expected_hex_len {
+        return Err(Error::Format(format!(
+            "sha256 hex length {} (expected {})",
+            hex_val.len(),
+            expected_hex_len
+        )));
+    }
 
     if !hex_val.as_bytes().iter().all(|b| HEX_CHARS.contains(b)) {
         return Err(Error::Format(
@@ -103,7 +106,7 @@ fn parse_hash_string(s: &str) -> Result<(HashAlgorithm, String, Vec<u8>)> {
     let bytes = hex::decode(hex_val)
         .map_err(|_| Error::Format("invalid hex encoding".into()))?;
 
-    Ok((alg, hex_val.to_string(), bytes))
+    Ok((hex_val.to_string(), bytes))
 }
 
 fn validate_base64url(s: &str, expected_encoded: usize, expected_bytes: usize) -> Result<Vec<u8>> {
@@ -151,7 +154,7 @@ impl Statement {
     /// `Statement` or an `Error::Format` with a descriptive message.
     ///
     /// This function does NOT perform cryptographic verification.
-    /// Use `verify_statement` or `verify_bytes` for that.
+    /// Use `verify_statement` or `verify_consistency` for that.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let text = std::str::from_utf8(data)
             .map_err(|_| Error::Format("not valid UTF-8".into()))?;
@@ -264,7 +267,7 @@ impl Statement {
 
         let parent_val = if has_parent {
             let p = fields[2].1.to_string();
-            parse_hash_string(&p)?;
+            validate_hash_prefix(&p)?;
             Some(p)
         } else {
             None
@@ -275,7 +278,7 @@ impl Statement {
         let key_idx = if has_parent { 5 } else { 4 };
         let sig_idx = if has_parent { 6 } else { 5 };
 
-        let (hash_alg, hash_hex_str, hash_bytes) = parse_hash_string(fields[hash_line_idx].1)?;
+        let (hash_hex_str, hash_bytes) = parse_hash_string(fields[hash_line_idx].1)?;
         let hash_val = fields[hash_line_idx].1.to_string();
 
         let time = validate_timestamp(fields[time_idx].1)?;
@@ -295,7 +298,6 @@ impl Statement {
             parent: parent_val,
             hash: hash_val,
             hash_hex: hash_hex_str,
-            hash_alg,
             hash_bytes,
             time,
             key_b64: fields[key_idx].1.to_string(),
@@ -331,7 +333,7 @@ impl Statement {
     }
 }
 
-/// Build a signed provenance statement (defaults to SHA-256).
+/// Build a signed provenance statement (SHA-256).
 ///
 /// This is the main entry point for signing. It hashes the artifact, derives
 /// the public key from the secret key, constructs the canonical body, signs
@@ -359,19 +361,6 @@ pub fn build_statement(
     timestamp: u64,
     parent_hash: Option<&str>,
 ) -> Result<Statement> {
-    build_statement_with_algorithm(secret, artifact_bytes, timestamp, parent_hash, HashAlgorithm::Sha256)
-}
-
-/// Build a signed provenance statement with a specified hash algorithm.
-///
-/// Same as `build_statement` but allows choosing the hash algorithm.
-pub fn build_statement_with_algorithm(
-    secret: &crypto::SecretKey,
-    artifact_bytes: &[u8],
-    timestamp: u64,
-    parent_hash: Option<&str>,
-    algorithm: HashAlgorithm,
-) -> Result<Statement> {
     if (artifact_bytes.len() as u64) > crate::MAX_ARTIFACT_SIZE {
         return Err(Error::Format(format!(
             "artifact too large ({} bytes, max {})",
@@ -379,9 +368,9 @@ pub fn build_statement_with_algorithm(
             crate::MAX_ARTIFACT_SIZE
         )));
     }
-    let alg_prefix = algorithm.to_string();
-    let (hash_hex_str, hash_bytes_vec) = hash::hash_data(artifact_bytes, &algorithm);
-    let hash_str = format!("{}:{}", alg_prefix, hash_hex_str);
+    let hash_hex_str = hash::hash_hex(artifact_bytes);
+    let hash_bytes_vec = hash::hash_bytes(artifact_bytes).to_vec();
+    let hash_str = format!("sha256:{}", hash_hex_str);
 
     let pair = crypto::generate_keypair_from_seed(&secret.0);
     let public_b64 = crate::base64_encode(pair.public.as_bytes());
@@ -435,7 +424,6 @@ pub fn build_statement_with_algorithm(
         parent: parent_hash.map(|s| s.to_string()),
         hash: hash_str,
         hash_hex: hash_hex_str,
-        hash_alg: algorithm,
         hash_bytes: hash_bytes_vec,
         time: timestamp,
         key_b64: public_b64,
@@ -465,9 +453,9 @@ pub fn encode_statement(stmt: &Statement) -> Vec<u8> {
 /// 1. The artifact hash matches the statement's hash field
 /// 2. The Ed25519 signature is valid for the canonical body
 ///
-/// For most users, `verify_bytes` is simpler — it handles parsing too.
+/// For most users, `verify_consistency` is simpler — it handles parsing too.
 pub fn verify_statement(stmt: &Statement, artifact_bytes: &[u8]) -> Result<()> {
-    let (actual_hash_hex, _) = hash::hash_data(artifact_bytes, &stmt.hash_alg);
+    let actual_hash_hex = hash::hash_hex(artifact_bytes);
     if actual_hash_hex != stmt.hash_hex {
         return Err(Error::HashMismatch {
             expected: stmt.hash_hex.clone(),
@@ -483,7 +471,7 @@ pub fn verify_statement(stmt: &Statement, artifact_bytes: &[u8]) -> Result<()> {
 
 /// Verify a statement against a trusted public key.
 ///
-/// Like `verify_bytes`, but additionally checks that the statement's public
+/// Like `verify_consistency`, but additionally checks that the statement's public
 /// key matches the trusted key. This prevents an attacker from presenting a
 /// statement signed by their own key and getting VERIFIED in return.
 ///
@@ -498,7 +486,7 @@ pub fn verify_statement(stmt: &Statement, artifact_bytes: &[u8]) -> Result<()> {
 /// * `Ok(())` — The statement is valid AND signed by the trusted key
 /// * `Err(Error::KeyMismatch)` — The statement's key doesn't match the trusted key
 /// * `Err(Error)` — Parsing, hash, or signature verification failed
-pub fn verify_against_key(
+pub fn verify(
     statement_bytes: &[u8],
     artifact_bytes: &[u8],
     trusted_public_key: &[u8; 32],
@@ -512,7 +500,7 @@ pub fn verify_against_key(
 
 /// Verify a statement chain where all links must use the trusted public key.
 ///
-/// Like `verify_chain`, but additionally checks that every statement in the
+/// Like `verify_chain_consistency`, but additionally checks that every statement in the
 /// chain (child and parent) uses the same trusted public key. This prevents
 /// key substitution attacks in provenance chains.
 ///
@@ -529,7 +517,7 @@ pub fn verify_against_key(
 /// * `Ok(())` — The chain is valid AND all links use the trusted key
 /// * `Err(Error::KeyMismatch)` — Any link's key doesn't match the trusted key
 /// * `Err(Error)` — Parsing, hash, signature, or parent hash mismatch
-pub fn verify_chain_against_key(
+pub fn verify_chain(
     child_bytes: &[u8],
     child_artifact_bytes: &[u8],
     parent_bytes: Option<&[u8]>,
@@ -569,9 +557,9 @@ pub fn verify_chain_against_key(
 /// hash. If the child has no parent, the parent parameters are ignored.
 ///
 /// NOTE: This function does NOT check the public key against a trusted key.
-/// Use `verify_against_key` or `verify_chain_against_key` if you need to
-/// ensure the statement was signed by a specific trusted key.
-pub fn verify_chain(
+/// Use `verify` or `verify_chain` if you need to ensure the statement was
+/// signed by a specific trusted key.
+pub fn verify_chain_consistency(
     child_bytes: &[u8],
     child_artifact_bytes: &[u8],
     parent_bytes: Option<&[u8]>,

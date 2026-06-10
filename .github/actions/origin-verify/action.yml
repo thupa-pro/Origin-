@@ -34,5 +34,5 @@ runs:
         if [ -n "${{ inputs.public-key }}" ]; then
           origin verify "${{ inputs.statement }}" "${{ inputs.artifact }}" --trusted-key "${{ inputs.public-key }}"
         else
-          origin verify "${{ inputs.statement }}" "${{ inputs.artifact }}"
+          origin verify "${{ inputs.statement }}" "${{ inputs.artifact }}" --consistency-only
         fi

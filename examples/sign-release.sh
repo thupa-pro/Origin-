@@ -29,7 +29,7 @@ origin sign "$ARTIFACT" --key "$KEY"
 
 echo ""
 echo "Verifying..."
-origin verify "${ARTIFACT}.origin" "$ARTIFACT"
+origin verify "${ARTIFACT}.origin" "$ARTIFACT" --consistency-only
 
 echo ""
 echo "Done. Statement written to ${ARTIFACT}.origin"

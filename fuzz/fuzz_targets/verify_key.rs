@@ -25,35 +25,33 @@ fuzz_target!(|data: &[u8]| {
     let op = data[0] % 6;
 
     match op {
-        // Mutate statement bytes with correct trusted key
         0 | 1 => {
             let mut mutated = stmt_bytes.clone();
             let pos = (data[1] as usize) % mutated.len();
             mutated[pos] ^= data[2] ^ data[3];
-            let _ = origin_core::verify_against_key(&mutated, art_bytes, &trusted_key);
+            let _ = origin_core::verify(&mutated, art_bytes, &trusted_key);
         }
-        // Mutate statement bytes with WRONG trusted key
         2 | 3 => {
             let mut mutated = stmt_bytes.clone();
             let pos = (data[1] as usize) % mutated.len();
             mutated[pos] ^= data[2] ^ data[3];
             let wrong_key = origin_core::generate_keypair_from_seed(&[99u8; 32]).public.0;
-            let _ = origin_core::verify_against_key(&mutated, art_bytes, &wrong_key);
+            let _ = origin_core::verify(&mutated, art_bytes, &wrong_key);
         }
-        // Mutate artifact bytes with correct trusted key
         4 => {
             let mut mutated = art_bytes.clone();
             let pos = (data[1] as usize) % mutated.len();
             mutated[pos] ^= data[2] ^ data[3];
-            let _ = origin_core::verify_against_key(stmt_bytes, &mutated, &trusted_key);
+            let _ = origin_core::verify(stmt_bytes, &mutated, &trusted_key);
         }
-        // Mutate both
         5 => {
             let mut s = stmt_bytes.clone();
             let mut a = art_bytes.clone();
-            s[(data[1] as usize) % s.len()] ^= data[2];
-            a[(data[3] as usize) % a.len()] ^= data[2];
-            let _ = origin_core::verify_against_key(&s, &a, &trusted_key);
+            let s_len = s.len();
+            let a_len = a.len();
+            s[(data[1] as usize) % s_len] ^= data[2];
+            a[(data[3] as usize) % a_len] ^= data[2];
+            let _ = origin_core::verify(&s, &a, &trusted_key);
         }
         _ => {}
     }

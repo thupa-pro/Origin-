@@ -39,6 +39,9 @@ _origin() {
                     ;;
                 verify)
                     _arguments \
+                        '--trusted-key[Trusted public key file]:file:_files' \
+                        '--consistency-only[Check hash + signature without key pinning]' \
+                        '--parent[Parent statement artifact]:file:_files' \
                         "1:statement:_files -g '*.origin'" \
                         "2:artifact:_files"
                     ;;

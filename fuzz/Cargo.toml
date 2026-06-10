@@ -11,5 +11,21 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 origin-core = { path = "../origin-core" }
 
+[[bin]]
+name = "parse"
+path = "fuzz_targets/parse.rs"
+
+[[bin]]
+name = "verify"
+path = "fuzz_targets/verify.rs"
+
+[[bin]]
+name = "verify_key"
+path = "fuzz_targets/verify_key.rs"
+
+[[bin]]
+name = "verify_chain"
+path = "fuzz_targets/verify_chain.rs"
+
 [profile.release]
 debug = 1

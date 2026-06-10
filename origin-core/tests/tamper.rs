@@ -30,7 +30,7 @@ fn test_tamper_hash() {
         "hash: sha256:",
         "hash: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     );
-    let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
+    let result = origin_core::verify_consistency(tampered.as_bytes(), &art);
     assert!(result.is_err(), "tampered hash must fail verification");
 }
 
@@ -41,7 +41,7 @@ fn test_tamper_signature() {
     let text = String::from_utf8(stmt).unwrap();
     let tampered = text.trim_end_matches('\n');
     let tampered = tampered.strip_suffix('=').unwrap_or(tampered).to_owned() + "A\n";
-    let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
+    let result = origin_core::verify_consistency(tampered.as_bytes(), &art);
     assert!(result.is_err(), "tampered signature must fail verification");
 }
 
@@ -51,7 +51,7 @@ fn test_tamper_timestamp_advisory() {
     let (stmt, art) = make_test_statement();
     let text = String::from_utf8(stmt).unwrap();
     let tampered = text.replace("time: 1717776000", "time: 1717776001");
-    let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
+    let result = origin_core::verify_consistency(tampered.as_bytes(), &art);
     assert!(result.is_ok(), "timestamp is advisory — changing it must NOT break verification");
 }
 
@@ -64,7 +64,7 @@ fn test_tamper_pubkey() {
         &text.lines().nth(4).unwrap()[..10],
         "AAAAAAAAAA",
     );
-    let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
+    let result = origin_core::verify_consistency(tampered.as_bytes(), &art);
     assert!(result.is_err(), "tampered pubkey must fail verification");
 }
 
@@ -74,7 +74,7 @@ fn test_tamper_origin() {
     let (stmt, art) = make_test_statement();
     let text = String::from_utf8(stmt).unwrap();
     let tampered = text.replace("origin: v1", "origin: v2");
-    let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
+    let result = origin_core::verify_consistency(tampered.as_bytes(), &art);
     assert!(result.is_err(), "tampered origin must fail verification");
 }
 
@@ -84,7 +84,7 @@ fn test_tamper_type() {
     let (stmt, art) = make_test_statement();
     let text = String::from_utf8(stmt).unwrap();
     let tampered = text.replace("type: provenance", "type: provenance2");
-    let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
+    let result = origin_core::verify_consistency(tampered.as_bytes(), &art);
     assert!(result.is_err(), "tampered type must fail verification");
 }
 
@@ -93,7 +93,7 @@ fn test_tamper_type() {
 fn test_wrong_artifact() {
     let (stmt, _) = make_test_statement();
     let wrong_artifact = b"this is not the original artifact";
-    let result = origin_core::verify_bytes(&stmt, wrong_artifact);
+    let result = origin_core::verify_consistency(&stmt, wrong_artifact);
     assert!(result.is_err(), "wrong artifact must fail verification");
 }
 
@@ -104,9 +104,9 @@ fn test_empty_artifact() {
     let secret = SecretKey::from_bytes(&seed).unwrap();
     let stmt = build_statement(&secret, b"", 0, None).unwrap();
     let enc = encode_statement(&stmt);
-    let result = origin_core::verify_bytes(&enc, b"");
+    let result = origin_core::verify_consistency(&enc, b"");
     assert!(result.is_ok(), "empty artifact must verify correctly");
-    let result2 = origin_core::verify_bytes(&enc, b"x");
+    let result2 = origin_core::verify_consistency(&enc, b"x");
     assert!(result2.is_err(), "non-empty artifact must fail against empty-artifact statement");
 }
 
@@ -118,7 +118,7 @@ fn test_reordered_lines() {
     let mut lines: Vec<&str> = text.lines().collect();
     lines.swap(0, 1);
     let tampered = lines.join("\n") + "\n";
-    let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
+    let result = origin_core::verify_consistency(tampered.as_bytes(), &art);
     assert!(result.is_err(), "reordered lines must fail");
 }
 
@@ -128,7 +128,7 @@ fn test_trailing_content() {
     let (stmt, art) = make_test_statement();
     let text = String::from_utf8(stmt).unwrap();
     let tampered = text.trim_end_matches('\n').to_string() + "\nextra: garbage\n";
-    let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
+    let result = origin_core::verify_consistency(tampered.as_bytes(), &art);
     assert!(result.is_err(), "extra lines must fail");
 }
 
@@ -141,6 +141,6 @@ fn test_tamper_parent_hash() {
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     );
-    let result = origin_core::verify_bytes(tampered.as_bytes(), &art);
+    let result = origin_core::verify_consistency(tampered.as_bytes(), &art);
     assert!(result.is_err(), "tampered parent hash must fail verification");
 }

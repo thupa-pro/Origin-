@@ -32,50 +32,47 @@ fuzz_target!(|data: &[u8]| {
     let op = data[0] % 8;
 
     match op {
-        // Mutate child statement with trusted key
         0 | 1 => {
             let mut s = child_enc.clone();
             let pos = (data[1] as usize) % s.len();
             s[pos] ^= data[2] ^ data[3];
-            let _ = origin_core::verify_chain_against_key(
+            let _ = origin_core::verify_chain(
                 &s, &child_art, Some(&parent_enc), Some(&parent_art), &trusted_key,
             );
         }
-        // Mutate parent statement with trusted key
         2 | 3 => {
             let mut s = parent_enc.clone();
             let pos = (data[1] as usize) % s.len();
             s[pos] ^= data[2] ^ data[3];
-            let _ = origin_core::verify_chain_against_key(
+            let _ = origin_core::verify_chain(
                 &child_enc, &child_art, Some(&s), Some(&parent_art), &trusted_key,
             );
         }
-        // No parent provided (exercises MissingParent path)
         4 => {
             let mut s = child_enc.clone();
             let pos = (data[1] as usize) % s.len();
             s[pos] ^= data[2] ^ data[3];
-            let _ = origin_core::verify_chain_against_key(
+            let _ = origin_core::verify_chain(
                 &s, &child_art, None, None, &trusted_key,
             );
         }
-        // Mutate both child and parent
         5 | 6 => {
             let mut c = child_enc.clone();
             let mut p = parent_enc.clone();
-            c[(data[1] as usize) % c.len()] ^= data[2];
-            p[(data[3] as usize) % p.len()] ^= data[2];
-            let _ = origin_core::verify_chain_against_key(
+            let c_len = c.len();
+            let p_len = p.len();
+            c[(data[1] as usize) % c_len] ^= data[2];
+            p[(data[3] as usize) % p_len] ^= data[2];
+            let _ = origin_core::verify_chain(
                 &c, &child_art, Some(&p), Some(&parent_art), &trusted_key,
             );
         }
-        // Wrong trusted key
         7 => {
             let wrong_key = origin_core::generate_keypair_from_seed(&[99u8; 32]).public.0;
             let mut s = child_enc.clone();
             let pos = (data[1] as usize) % s.len();
             s[pos] ^= data[2] ^ data[3];
-            let _ = origin_core::verify_chain_against_key(
+            let _ = origin_core::verify_chain(
                 &s, &child_art, Some(&parent_enc), Some(&parent_art), &wrong_key,
             );
         }

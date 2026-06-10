@@ -1,7 +1,7 @@
 .\" Man page for origin
 .\" Origin Protocol — cryptographic provenance for digital artifacts
 .\"
-.TH ORIGIN 1 "2026-06-09" "1.1.1" "Origin Manual"
+.TH ORIGIN 1 "2026-06-10" "1.2.0" "Origin Manual"
 .SH NAME
 origin \- cryptographic provenance for digital artifacts
 .SH SYNOPSIS
@@ -40,8 +40,11 @@ Secret key sources (in priority order):
 .br
 3. \fB--key\fR \fI-\fR (read from stdin)
 .TP
-.B verify \fIstatement\fR \fIartifact\fR
+.B verify \fIstatement\fR \fIartifact\fR [\fB--trusted-key\fR \fIfile\fR] [\fB--consistency-only\fR] [\fB--parent\fR \fIparent_stmt\fR \fIparent_art\fR]
 Verify a provenance statement against an artifact.
+With \fB--trusted-key\fR, pins verification to a specific public key.
+With \fB--consistency-only\fR, checks hash + signature without key pinning.
+With \fB--parent\fR, also verifies the parent in a provenance chain.
 Returns VERIFIED or FAILED. Exit code 0 on success, 1 on failure.
 .TP
 .B audit \fIstatement\fR
@@ -62,8 +65,11 @@ origin keygen
 Sign a file
 origin sign release.tar.gz \-\-key origin\-secret.key
 .TP
-Verify a signed file
-origin verify release.tar.gz.origin release.tar.gz
+Verify a signed file (with trusted key)
+origin verify release.tar.gz.origin release.tar.gz --trusted-key origin-public.key
+.TP
+Verify a signed file (consistency only, no key pinning)
+origin verify release.tar.gz.origin release.tar.gz --consistency-only
 .TP
 Chain a new statement to a parent
 origin sign v2.0.tar.gz \-\-key origin\-secret.key \-\-parent v1.0.tar.gz.origin

@@ -152,22 +152,11 @@ fn test_hash_too_short() {
 }
 
 #[test]
-fn test_hash_alg_sha384() {
-    let data = b"origin: v1\ntype: provenance\nhash: sha384:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n";
-    assert_parse_ok(data, "sha384 hash");
-}
-
-#[test]
-fn test_hash_alg_sha512() {
-    let hex128 = "a".repeat(128);
-    let data = format!("origin: v1\ntype: provenance\nhash: sha512:{}\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n", hex128);
-    assert_parse_ok(data.as_bytes(), "sha512 hash");
-}
-
-#[test]
 fn test_hash_alg_unknown() {
     let data = b"origin: v1\ntype: provenance\nhash: md5:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ntime: 0\nkey: xxxxx\nsig: xxxxx\n";
     assert_parse_fails(data, "unknown hash algorithm");
+    let err = format!("{}", Statement::parse(data).unwrap_err());
+    assert!(err.contains("sha256"), "error must mention 'sha256': {}", err);
 }
 
 #[test]
@@ -270,7 +259,7 @@ fn test_tab_in_value() {
     assert_parse_fails(data, "tab in value");
 }
 
-use origin_core::{build_statement, encode_statement, verify_chain};
+use origin_core::{build_statement, encode_statement, verify_chain_consistency};
 use origin_core::SecretKey;
 
 #[test]
@@ -283,7 +272,7 @@ fn test_verify_missing_parent() {
     let child = build_statement(&secret, child_artifact, 100, Some(parent_hash)).unwrap();
     let child_encoded = encode_statement(&child);
 
-    let result = verify_chain(&child_encoded, child_artifact, None, None);
+    let result = verify_chain_consistency(&child_encoded, child_artifact, None, None);
     assert!(result.is_err(), "must fail when parent is missing");
     let err = format!("{}", result.unwrap_err());
     assert!(err.contains("parent"), "error must mention parent: {}", err);
@@ -304,7 +293,7 @@ fn test_verify_wrong_parent() {
     let child = build_statement(&secret, child_artifact, 200, Some(wrong_hash)).unwrap();
     let child_encoded = encode_statement(&child);
 
-    let result = verify_chain(&child_encoded, child_artifact, Some(&parent_encoded), Some(parent_artifact));
+    let result = verify_chain_consistency(&child_encoded, child_artifact, Some(&parent_encoded), Some(parent_artifact));
     assert!(result.is_err(), "must fail when parent hash doesn't match");
     let err = format!("{}", result.unwrap_err());
     assert!(err.contains("Parent hash mismatch"), "error must indicate hash mismatch: {}", err);

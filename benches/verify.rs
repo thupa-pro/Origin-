@@ -18,7 +18,7 @@ fn bench_verify_valid(c: &mut Criterion) {
 
     c.bench_function("verify_valid", |b| {
         b.iter(|| {
-            let _ = origin_core::verify_bytes(black_box(encoded.as_bytes()), black_box(artifact));
+            let _ = origin_core::verify_consistency(black_box(&encoded), black_box(artifact));
         })
     });
 }

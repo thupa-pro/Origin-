@@ -1,6 +1,6 @@
 use origin_core::{
-    build_statement, build_statement_with_algorithm, encode_statement,
-    generate_keypair_from_seed, hash, verify_chain,
+    build_statement, encode_statement,
+    generate_keypair_from_seed, hash, verify_chain_consistency,
 };
 
 #[test]
@@ -51,8 +51,8 @@ fn test_deterministic_verification() {
     let stmt = build_statement(&secret, data, ts, None).unwrap();
     let encoded = encode_statement(&stmt);
 
-    let r1 = origin_core::verify_bytes(&encoded, data);
-    let r2 = origin_core::verify_bytes(&encoded, data);
+    let r1 = origin_core::verify_consistency(&encoded, data);
+    let r2 = origin_core::verify_consistency(&encoded, data);
     assert!(r1.is_ok(), "first verification must pass");
     assert!(r2.is_ok(), "second verification must pass");
 }
@@ -104,38 +104,6 @@ fn test_deterministic_canonical_body_with_parent() {
 }
 
 #[test]
-fn test_deterministic_signing_sha384() {
-    let seed = [42u8; 32];
-    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
-    let data = b"sha384 test artifact";
-    let ts = 1717776000;
-
-    let stmt1 = build_statement_with_algorithm(&secret, data, ts, None, origin_core::hash::HashAlgorithm::Sha384).unwrap();
-    let stmt2 = build_statement_with_algorithm(&secret, data, ts, None, origin_core::hash::HashAlgorithm::Sha384).unwrap();
-
-    let enc1 = encode_statement(&stmt1);
-    let enc2 = encode_statement(&stmt2);
-    assert_eq!(enc1, enc2, "sha384 signing must be deterministic");
-    assert!(stmt1.hash.starts_with("sha384:"), "hash prefix must be sha384");
-}
-
-#[test]
-fn test_deterministic_signing_sha512() {
-    let seed = [42u8; 32];
-    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
-    let data = b"sha512 test artifact";
-    let ts = 1717776000;
-
-    let stmt1 = build_statement_with_algorithm(&secret, data, ts, None, origin_core::hash::HashAlgorithm::Sha512).unwrap();
-    let stmt2 = build_statement_with_algorithm(&secret, data, ts, None, origin_core::hash::HashAlgorithm::Sha512).unwrap();
-
-    let enc1 = encode_statement(&stmt1);
-    let enc2 = encode_statement(&stmt2);
-    assert_eq!(enc1, enc2, "sha512 signing must be deterministic");
-    assert!(stmt1.hash.starts_with("sha512:"), "hash prefix must be sha512");
-}
-
-#[test]
 fn test_verify_chain_valid() {
     let seed = [42u8; 32];
     let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
@@ -148,7 +116,7 @@ fn test_verify_chain_valid() {
     let child_stmt = build_statement(&secret, child_artifact, 200, Some(&parent_stmt.hash)).unwrap();
     let child_encoded = encode_statement(&child_stmt);
 
-    let result = verify_chain(&child_encoded, child_artifact, Some(&parent_encoded), Some(parent_artifact));
+    let result = verify_chain_consistency(&child_encoded, child_artifact, Some(&parent_encoded), Some(parent_artifact));
     assert!(result.is_ok(), "valid chain must verify: {:?}", result);
 }
 
@@ -161,6 +129,6 @@ fn test_verify_chain_no_parent_ok() {
     let stmt = build_statement(&secret, artifact, 100, None).unwrap();
     let encoded = encode_statement(&stmt);
 
-    let result = verify_chain(&encoded, artifact, None, None);
+    let result = verify_chain_consistency(&encoded, artifact, None, None);
     assert!(result.is_ok(), "standalone statement must verify: {:?}", result);
 }

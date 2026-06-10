@@ -28,6 +28,9 @@ complete -c origin -n "__fish_seen_subcommand_from sign" -a "(__fish_complete_pa
 
 # verify
 complete -c origin -n "__fish_seen_subcommand_from verify" -s h -l help -d "Print help"
+complete -c origin -n "__fish_seen_subcommand_from verify"    -l trusted-key      -d "Trusted public key file" -r -F
+complete -c origin -n "__fish_seen_subcommand_from verify"    -l consistency-only -d "Check hash + signature without key pinning"
+complete -c origin -n "__fish_seen_subcommand_from verify"    -l parent           -d "Parent statement artifact" -r -F
 complete -c origin -n "__fish_seen_subcommand_from verify" -a "(__fish_complete_path)"
 
 # audit

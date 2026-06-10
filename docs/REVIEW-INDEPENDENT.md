@@ -93,7 +93,7 @@ Current set: `(hash, key, time, sig)`. The absolute minimum is `(hash, key, sig)
 | Attack vector | Prevented by protocol? | Mitigation outside protocol |
 |---|---|---|
 | Signature forgery | ✅ Yes (Ed25519 EUF-CMA) | N/A |
-| Hash collision | ✅ Yes (SHA-256 collision resistance) | Use SHA-384 or SHA-512 |
+| Hash collision | ✅ Yes (SHA-256 collision resistance) | Use SHA-256 with Ed25519's 128-bit security — hash and signature security levels are matched |
 | Parser trickery | ✅ Yes (strict parser, 62 tests) | N/A |
 | Key compromise | ❌ No | File permissions, HSM, OS keychain |
 | Distributor trojan | ❌ No | Reproducible builds, signed binaries |
@@ -371,7 +371,7 @@ The protocol needs **two things** before it can be called a foundation:
 
 1. A `type` discriminant field (see Phase 5). Without it, the protocol has one statement type forever. With it, the protocol can grow revocation, delegation, manifests, and more — all within the same format, same verification algorithm, same tooling.
 
-2. The RFC document must be updated to match the current implementation (advisory timestamp, parent field, hash agility). The spec and the code are out of sync — this is a documentation gap, not a protocol gap, but it undermines confidence.
+2. The RFC document must be updated to match the current implementation (advisory timestamp, parent field, hash agility removed — SHA-256 only). The spec and the code are out of sync — this is a documentation gap, not a protocol gap, but it undermines confidence.
 
 ### Closing assessment
 

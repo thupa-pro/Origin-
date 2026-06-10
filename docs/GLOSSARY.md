@@ -16,7 +16,7 @@ Any digital file or byte sequence that can be hashed and signed: a binary, docum
 
 ### Artifact Hash
 
-A cryptographic digest of the artifact bytes. Origin supports SHA-256 (default), SHA-384, and SHA-512, encoded as lowercase hex with an algorithm prefix.
+A cryptographic digest of the artifact bytes. Origin uses SHA-256, encoded as lowercase hex with the `sha256:` prefix.
 
 Example: `sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad`
 
@@ -36,7 +36,7 @@ The Edwards-curve Digital Signature Algorithm per RFC 8032. Origin uses Ed25519 
 
 ### Hash Agility
 
-The ability to support multiple hash algorithms within the same protocol. Origin supports SHA-256, SHA-384, and SHA-512, identified by the prefix in the hash field (e.g., `sha256:`, `sha384:`, `sha512:`).
+The ability to support multiple hash algorithms within the same protocol. Origin currently supports SHA-256, identified by the `sha256:` prefix in the hash field. (Earlier versions supported SHA-384 and SHA-512.)
 
 ### Provenance
 

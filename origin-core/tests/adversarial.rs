@@ -1,5 +1,5 @@
 use origin_core::{
-    base64_encode, build_statement, verify_bytes, Statement,
+    base64_encode, build_statement, verify_consistency, Statement,
 };
 
 /// Timestamp is now advisory — changing it does NOT break verification.
@@ -13,11 +13,11 @@ fn test_timestamp_advisory() {
     let stmt = build_statement(&secret, data, original_ts, None).unwrap();
     let encoded = origin_core::encode_statement(&stmt);
 
-    assert!(verify_bytes(&encoded, data).is_ok(), "original must verify");
+    assert!(verify_consistency(&encoded, data).is_ok(), "original must verify");
 
     let text = String::from_utf8(encoded).unwrap();
     let tampered = text.replace("time: 1717776000", "time: 1717776001");
-    let result = verify_bytes(tampered.as_bytes(), data);
+    let result = verify_consistency(tampered.as_bytes(), data);
     assert!(result.is_ok(), "timestamp is advisory — changing it must NOT break verification");
 }
 
@@ -32,7 +32,7 @@ fn test_origin_replay_attack() {
     let text = String::from_utf8(encoded).unwrap();
     let tampered = text.replace("origin: v1", "origin: v2");
 
-    let result = verify_bytes(tampered.as_bytes(), data);
+    let result = verify_consistency(tampered.as_bytes(), data);
     assert!(result.is_err(), "origin change must fail");
 }
 
@@ -47,7 +47,7 @@ fn test_artifact_replay_attack() {
     let stmt = build_statement(&secret, data1, 1717776000, None).unwrap();
     let encoded = origin_core::encode_statement(&stmt);
 
-    let result = verify_bytes(&encoded, data2);
+    let result = verify_consistency(&encoded, data2);
     assert!(result.is_err(), "replay across artifacts must fail");
 }
 
@@ -72,7 +72,7 @@ fn test_malformed_statement_preserving_sig() {
     ];
 
     for tampered in attacks {
-        let result = verify_bytes(tampered.as_bytes(), data);
+        let result = verify_consistency(tampered.as_bytes(), data);
         assert!(result.is_err(), "malformed statement must fail");
     }
 }
@@ -97,7 +97,7 @@ fn test_pubkey_swap_attack() {
     let new_key_line = format!("key: {}", pk2_b64);
     let tampered = text.replace(old_key_line, &new_key_line);
 
-    let result = verify_bytes(tampered.as_bytes(), data);
+    let result = verify_consistency(tampered.as_bytes(), data);
     assert!(result.is_err(), "pubkey swap must fail");
 }
 
@@ -214,7 +214,7 @@ fn test_parent_tamper_attack() {
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     );
 
-    let result = verify_bytes(tampered.as_bytes(), data);
+    let result = verify_consistency(tampered.as_bytes(), data);
     assert!(result.is_err(), "tampered parent must fail verification");
 }
 
@@ -230,7 +230,7 @@ fn test_type_field_tamper() {
     let text = String::from_utf8(encoded).unwrap();
     let tampered = text.replace("type: provenance", "type: provenance2");
 
-    let result = verify_bytes(tampered.as_bytes(), data);
+    let result = verify_consistency(tampered.as_bytes(), data);
     assert!(result.is_err(), "tampered type must fail");
 }
 
@@ -243,7 +243,7 @@ fn test_verification_error_types() {
     let stmt = build_statement(&secret, data, 100, None).unwrap();
     let encoded = origin_core::encode_statement(&stmt);
 
-    let r = verify_bytes(&encoded, b"wrong data");
+    let r = verify_consistency(&encoded, b"wrong data");
     assert!(
         matches!(r, Err(origin_core::Error::HashMismatch { .. })),
         "expected HashMismatch error, got {:?}",
@@ -254,5 +254,5 @@ fn test_verification_error_types() {
     if let Some(last) = tampered.last_mut() {
         *last ^= 1;
     }
-    let _ = verify_bytes(&tampered, data);
+    let _ = verify_consistency(&tampered, data);
 }

@@ -24,7 +24,7 @@ origin sign "$ARTIFACT" --key "$KEY" --parent "$PARENT"
 
 echo ""
 echo "Verifying..."
-origin verify "${ARTIFACT}.origin" "$ARTIFACT"
+origin verify "${ARTIFACT}.origin" "$ARTIFACT" --consistency-only
 
 echo ""
 echo "Parent reference:"

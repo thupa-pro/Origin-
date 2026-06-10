@@ -7,7 +7,7 @@
 /// # Quickstart
 ///
 /// ```rust,ignore
-/// use origin_core::{build_statement, encode_statement, verify_bytes, SecretKey};
+/// use origin_core::{build_statement, encode_statement, verify_consistency, SecretKey};
 ///
 /// // Generate a key from a seed (deterministic for testing)
 /// let seed = [42u8; 32];
@@ -19,12 +19,12 @@
 /// let encoded = encode_statement(&stmt);
 ///
 /// // Verify
-/// assert!(verify_bytes(&encoded, artifact).is_ok());
+/// assert!(verify_consistency(&encoded, artifact).is_ok());
 ///
 /// // Verify with trusted key (recommended)
 /// use origin_core::generate_keypair_from_seed;
 /// let trusted = generate_keypair_from_seed(&seed).public.0;
-/// assert!(origin_core::verify_against_key(&encoded, artifact, &trusted).is_ok());
+/// assert!(origin_core::verify(&encoded, artifact, &trusted).is_ok());
 /// ```
 ///
 /// # Protocol
@@ -40,18 +40,18 @@ pub use crypto::{generate_keypair, generate_keypair_from_seed, Keypair, PublicKe
 pub use error::{Error, Result};
 pub use hash::hash_bytes;
 pub use statement::{
-    build_statement, build_statement_with_algorithm, encode_statement,
-    verify_statement, verify_against_key, verify_chain, verify_chain_against_key, Statement,
+    build_statement, encode_statement, verify_statement,
+    verify, verify_chain, verify_chain_consistency, Statement,
 };
 
 /// Convenience type alias for verification results.
 pub type Verdict = std::result::Result<(), Error>;
 
-/// Verify a provenance statement against artifact bytes.
+/// Verify a provenance statement against artifact bytes (consistency check).
 ///
-/// This is the main entry point for verification. It parses the statement,
-/// reconstructs the canonical body, validates the hash, and verifies the
-/// Ed25519 signature in one call.
+/// This checks that the statement is internally consistent — the hash matches
+/// the artifact and the signature is valid. It does NOT check the public key
+/// against a trusted key. Use `verify()` for trusted key verification.
 ///
 /// # Arguments
 ///
@@ -68,12 +68,12 @@ pub type Verdict = std::result::Result<(), Error>;
 /// ```rust,ignore
 /// let stmt = std::fs::read("file.tar.gz.origin").unwrap();
 /// let art = std::fs::read("file.tar.gz").unwrap();
-/// match origin_core::verify_bytes(&stmt, &art) {
+/// match origin_core::verify_consistency(&stmt, &art) {
 ///     Ok(()) => println!("VERIFIED"),
 ///     Err(e) => println!("FAILED: {}", e),
 /// }
 /// ```
-pub fn verify_bytes(statement_bytes: &[u8], artifact_bytes: &[u8]) -> Verdict {
+pub fn verify_consistency(statement_bytes: &[u8], artifact_bytes: &[u8]) -> Verdict {
     if (artifact_bytes.len() as u64) > MAX_ARTIFACT_SIZE {
         return Err(Error::Format(format!(
             "artifact too large ({} bytes, max {})",
@@ -82,7 +82,7 @@ pub fn verify_bytes(statement_bytes: &[u8], artifact_bytes: &[u8]) -> Verdict {
         )));
     }
     let stmt = statement::Statement::parse(statement_bytes)?;
-    verify_statement(&stmt, artifact_bytes)
+    statement::verify_statement(&stmt, artifact_bytes)
 }
 
 use base64::Engine as _;
@@ -97,7 +97,7 @@ pub fn base64_encode(bytes: &[u8]) -> String {
 
 /// Maximum artifact size in bytes (2 GiB).
 ///
-/// Artifacts larger than this are rejected by `verify_bytes` and
+/// Artifacts larger than this are rejected by `verify_consistency` and
 /// `build_statement` to prevent memory exhaustion.
 pub const MAX_ARTIFACT_SIZE: u64 = 2_147_483_648;
 

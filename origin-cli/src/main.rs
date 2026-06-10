@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use origin_core::{
     base64_encode, build_statement, encode_statement, generate_keypair, hash,
-    verify_chain, verify_chain_against_key, SecretKey, Statement,
+    verify_chain, verify_chain_consistency, SecretKey, Statement,
 };
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -67,15 +67,20 @@ enum Commands {
     },
     /// Verify a provenance statement against an artifact
     ///
+    /// By default, requires --trusted-key to pin the expected signer.
+    /// Use --consistency-only to verify cryptographic integrity without
+    /// key pinning (internal consistency check only).
+    ///
     /// Returns VERIFIED if the statement is cryptographically valid for the
     /// given artifact. Returns FAILED with an error message otherwise.
     ///
     /// If --parent is given, also verifies the parent statement in the chain.
     ///
     /// Examples:
-    ///   origin verify myapp.origin myapp
-    ///   origin verify release-v1.0.0.origin release-v1.0.0.tar.gz
-    ///   origin verify child.origin child.tar.gz --parent parent.origin parent.tar.gz
+    ///   origin verify myapp.origin myapp --trusted-key origin-public.key
+    ///   origin verify release-v1.0.0.origin release-v1.0.0.tar.gz --trusted-key release.pub
+    ///   origin verify child.origin child.tar.gz --parent parent.origin parent.tar.gz --trusted-key origin-public.key
+    ///   origin verify myapp.origin myapp --consistency-only
     Verify {
         /// Path to the statement file
         statement: PathBuf,
@@ -87,6 +92,9 @@ enum Commands {
         /// Path to a trusted public key file (base64url, 44 chars with padding)
         #[arg(long)]
         trusted_key: Option<PathBuf>,
+        /// Skip key verification — check cryptographic integrity only
+        #[arg(long)]
+        consistency_only: bool,
     },
     /// Display a human-readable audit of a statement
     ///
@@ -246,6 +254,7 @@ fn main() {
             artifact,
             parent,
             trusted_key,
+            consistency_only,
         } => {
             let stmt_data = match std::fs::read(&statement) {
                 Ok(d) => d,
@@ -260,33 +269,6 @@ fn main() {
                     eprintln!("error: cannot read '{}': {}", artifact.display(), e);
                     std::process::exit(1);
                 }
-            };
-
-            let trusted_key_bytes = if let Some(ref tk_path) = trusted_key {
-                let tk_data = match std::fs::read_to_string(tk_path) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        eprintln!("error: cannot read trusted key '{}': {}", tk_path.display(), e);
-                        std::process::exit(1);
-                    }
-                };
-                let trimmed = tk_data.trim().to_string();
-                let decoded = match origin_core::base64url_decode(&trimmed) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        eprintln!("error: invalid base64url in trusted key: {}", e);
-                        std::process::exit(1);
-                    }
-                };
-                if decoded.len() != 32 {
-                    eprintln!("error: trusted public key must decode to 32 bytes (got {})", decoded.len());
-                    std::process::exit(1);
-                }
-                let mut key = [0u8; 32];
-                key.copy_from_slice(&decoded);
-                Some(key)
-            } else {
-                None
             };
 
             let (parent_stmt_data, parent_art_data) = if let Some(ref args) = parent {
@@ -313,16 +295,41 @@ fn main() {
                 (None, None)
             };
 
-            let result = match trusted_key_bytes {
-                Some(tk) => verify_chain_against_key(
+            let result = if consistency_only {
+                verify_chain_consistency(
                     &stmt_data, &art_data,
                     parent_stmt_data.as_deref(), parent_art_data.as_deref(),
-                    &tk,
-                ),
-                None => verify_chain(
+                )
+            } else if let Some(ref tk_path) = trusted_key {
+                let tk_data = match std::fs::read_to_string(tk_path) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("error: cannot read trusted key '{}': {}", tk_path.display(), e);
+                        std::process::exit(1);
+                    }
+                };
+                let trimmed = tk_data.trim().to_string();
+                let decoded = match origin_core::base64url_decode(&trimmed) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("error: invalid base64url in trusted key: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                if decoded.len() != 32 {
+                    eprintln!("error: trusted public key must decode to 32 bytes (got {})", decoded.len());
+                    std::process::exit(1);
+                }
+                let mut key = [0u8; 32];
+                key.copy_from_slice(&decoded);
+                verify_chain(
                     &stmt_data, &art_data,
                     parent_stmt_data.as_deref(), parent_art_data.as_deref(),
-                ),
+                    &key,
+                )
+            } else {
+                eprintln!("error: must specify --trusted-key or --consistency-only");
+                std::process::exit(1);
             };
 
             match result {

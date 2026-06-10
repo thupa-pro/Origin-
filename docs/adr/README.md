@@ -79,7 +79,7 @@ SHA-256 is sufficient today but may not be forever. A changing hash algorithm sh
 
 ## Decision
 
-The hash field uses prefix notation: `<algorithm>:<hex>`. Supported: `sha256`, `sha384`, `sha512`. The signature covers the algorithm prefix.
+The hash field uses prefix notation: `<algorithm>:<hex>`. Supported: `sha256` only. The signature covers the algorithm prefix.
 
 ## Consequences
 

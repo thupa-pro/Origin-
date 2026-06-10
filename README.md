@@ -54,10 +54,10 @@ After install, run `origin --help` to confirm. The binary is `origin`, not `orig
 ## One Command
 
 ```bash
-origin verify release.tar.gz.origin release.tar.gz
+origin verify release.tar.gz.origin release.tar.gz --trusted-key origin-public.key
 ```
 
-Returns `VERIFIED` or `FAILED`. That's it.
+Returns `VERIFIED` or `FAILED`. Without `--trusted-key`, use `--consistency-only` to verify hash+signature match without pinning a specific key.
 
 ---
 
@@ -71,7 +71,7 @@ Origin separates the cryptographic verification from the trust decision:
 3. Alice signs a file with her secret key  →  Produces file.origin
 4. Bob downloads the file + .origin      →  From any channel
 5. Bob gets Alice's public key           →  From her website (trusted channel)
-6. Bob runs: origin verify file.origin file  →  VERIFIED
+6. Bob runs: origin verify file.origin file --trusted-key alice-public.key  →  VERIFIED
 ```
 
 **The verifier must obtain the trusted public key through a separate channel.** The statement contains a public key, but a forged statement would contain a forged key. The protocol proves "key X signed artifact Y" — deciding whether to trust key X is the verifier's job.
@@ -212,7 +212,7 @@ Displays all fields in human-readable form.
 | `origin hash <path>` | Print the SHA-256 hash of a file |
 | `origin keygen [--output <dir>]` | Generate an Ed25519 key pair |
 | `origin sign <path> --key <file>` | Sign an artifact, produce a `.origin` statement |
-| `origin verify <statement> <artifact>` | Verify a statement against an artifact |
+| `origin verify <statement> <artifact> [--trusted-key <keyfile> | --consistency-only]` | Verify a statement against an artifact |
 | `origin audit <statement>` | Display a human-readable audit |
 
 Secret key sources (in priority): `$ORIGIN_KEY` env var > `--key <file>` > `--key -` (stdin).
@@ -253,7 +253,7 @@ Statement written to release-v2.0.0.tar.gz.origin
 ### `origin verify <statement> <artifact>`
 
 ```
-$ origin verify release-v1.0.0.tar.gz.origin release-v1.0.0.tar.gz
+$ origin verify release-v1.0.0.tar.gz.origin release-v1.0.0.tar.gz --trusted-key origin-public.key
 VERIFIED
 ```
 
@@ -295,10 +295,10 @@ Key design points:
 | Feature | Status |
 |---|---|---|
 | Ed25519 signatures | ✅ |
-| SHA-256 / SHA-384 / SHA-512 | ✅ |
+| SHA-256 | ✅ |
 | Deterministic output | ✅ |
 | Fuzz-tested parser | ✅ cargo-fuzz |
-| Strict parser (66 tests) | ✅ |
+| Strict parser (87 tests) | ✅ |
 | Parent field (provenance chains) | ✅ |
 | Self-contained statements | ✅ |
 | Secret key zeroization on drop | ✅ |
@@ -333,7 +333,8 @@ Key design points:
 - **Hashing**: SHA-2 family (FIPS 180-4 compliant)
 - **Key erasure**: Secret key zeroized on drop via `zeroize` crate
 - **Parser**: Strict validation — no BOM, no CR, no control chars, no null bytes, no duplicate keys, no wrong-length fields
-- **Test coverage**: 66 tests (deterministic, tamper, negative, adversarial)
+- **Test coverage**: 79 unit + 8 proptest properties × 512 cases (deterministic, tamper, negative, adversarial, property-based roundtrips)
+- **Fuzz testing**: 4 cargo-fuzz targets (parse, verify, verify_key, verify_chain), zero crashes over 120s each
 
 See [THREAT_MODEL.md](docs/THREAT_MODEL.md) and [TRUST_MODEL.md](docs/TRUST_MODEL.md) for full security analysis.
 
@@ -369,7 +370,7 @@ curl -sLO https://github.com/thupa-pro/Origin/releases/latest/download/origin-li
 curl -sLO https://raw.githubusercontent.com/thupa-pro/Origin/main/docs/origin-public.key
 
 # Verify
-origin verify origin-linux-x86_64.origin origin-linux-x86_64.gz
+origin verify origin-linux-x86_64.origin origin-linux-x86_64.gz --trusted-key docs/origin-public.key
 ```
 
 The public key (`docs/origin-public.key`) is the trust anchor. Verify it through a separate channel (Signal, personal website, social media) before relying on it.
@@ -401,9 +402,9 @@ cargo test
 
 ## Status: Beta · [![Open Issues](https://img.shields.io/github/issues/thupa-pro/Origin)](https://github.com/thupa-pro/Origin/issues) [![Good First Issues](https://img.shields.io/github/issues/thupa-pro/Origin/good%20first%20issue)](https://github.com/thupa-pro/Origin/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 
-Origin v1.1.0. The protocol primitive is frozen. The API is stable. The format will not break without a major version bump.
+Origin v1.2.0. The protocol primitive is frozen. The API is stable. The format will not break without a major version bump.
 
-66 tests pass. Release build compiles with zero warnings.
+87 tests pass (79 unit + 8 proptest properties × 512 cases each). Release build compiles with zero warnings.
 
 ---
 
