@@ -103,7 +103,9 @@ jobs:
       with:
         target: ${{ matrix.target }}
     - run: cargo build --release --target ${{ matrix.target }}
+      env:
+        CARGO_TARGET_DIR: /tmp/origin-target
     - name: Upload binary
       uses: softprops/action-gh-release@v3
       with:
-        files: target/${{ matrix.target }}/release/origin
+        files: /tmp/origin-target/${{ matrix.target }}/release/origin
