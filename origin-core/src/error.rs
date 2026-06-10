@@ -34,6 +34,10 @@ pub enum Error {
     /// The statement has a parent field but no parent statement was provided.
     #[error("Statement has a parent field but no parent statement was provided")]
     MissingParent,
+
+    /// The statement's public key does not match the trusted public key.
+    #[error("Public key mismatch: statement key does not match trusted key")]
+    KeyMismatch,
 }
 
 impl From<std::io::Error> for Error {

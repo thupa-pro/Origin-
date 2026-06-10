@@ -78,8 +78,8 @@ impl Signature {
 pub fn generate_keypair() -> Keypair {
     let mut seed = [0u8; 32];
     use rand::rngs::OsRng;
-    use rand::RngCore;
-    OsRng.fill_bytes(&mut seed);
+    use rand::TryRngCore;
+    OsRng.try_fill_bytes(&mut seed).expect("OsRng failure");
     generate_keypair_from_seed(&seed)
 }
 

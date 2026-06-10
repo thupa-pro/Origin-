@@ -20,6 +20,11 @@
 ///
 /// // Verify
 /// assert!(verify_bytes(&encoded, artifact).is_ok());
+///
+/// // Verify with trusted key (recommended)
+/// use origin_core::generate_keypair_from_seed;
+/// let trusted = generate_keypair_from_seed(&seed).public.0;
+/// assert!(origin_core::verify_against_key(&encoded, artifact, &trusted).is_ok());
 /// ```
 ///
 /// # Protocol
@@ -36,7 +41,7 @@ pub use error::{Error, Result};
 pub use hash::hash_bytes;
 pub use statement::{
     build_statement, build_statement_with_algorithm, encode_statement,
-    verify_statement, verify_chain, Statement,
+    verify_statement, verify_against_key, verify_chain, verify_chain_against_key, Statement,
 };
 
 /// Convenience type alias for verification results.
@@ -69,6 +74,13 @@ pub type Verdict = std::result::Result<(), Error>;
 /// }
 /// ```
 pub fn verify_bytes(statement_bytes: &[u8], artifact_bytes: &[u8]) -> Verdict {
+    if (artifact_bytes.len() as u64) > MAX_ARTIFACT_SIZE {
+        return Err(Error::Format(format!(
+            "artifact too large ({} bytes, max {})",
+            artifact_bytes.len(),
+            MAX_ARTIFACT_SIZE
+        )));
+    }
     let stmt = statement::Statement::parse(statement_bytes)?;
     verify_statement(&stmt, artifact_bytes)
 }
@@ -83,10 +95,22 @@ pub fn base64_encode(bytes: &[u8]) -> String {
     URL_SAFE.encode(bytes)
 }
 
+/// Maximum artifact size in bytes (2 GiB).
+///
+/// Artifacts larger than this are rejected by `verify_bytes` and
+/// `build_statement` to prevent memory exhaustion.
+pub const MAX_ARTIFACT_SIZE: u64 = 2_147_483_648;
+
 /// Decode base64url (RFC 4648 §5, with padding).
 ///
-/// Supports both URL-safe and standard alphabets.
-pub fn base64_decode(s: &str) -> std::result::Result<Vec<u8>, base64::DecodeError> {
+/// Uses the URL-safe alphabet only (no `+` or `/`).
+pub fn base64url_decode(s: &str) -> std::result::Result<Vec<u8>, base64::DecodeError> {
     use base64::engine::general_purpose::URL_SAFE;
     URL_SAFE.decode(s)
+}
+
+/// Decode base64url (deprecated, use `base64url_decode` instead).
+#[deprecated(since = "1.1.2", note = "use base64url_decode instead")]
+pub fn base64_decode(s: &str) -> std::result::Result<Vec<u8>, base64::DecodeError> {
+    base64url_decode(s)
 }

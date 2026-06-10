@@ -114,7 +114,7 @@ fn validate_base64url(s: &str, expected_encoded: usize, expected_bytes: usize) -
             expected_encoded
         )));
     }
-    let bytes = crate::base64_decode(s)?;
+    let bytes = crate::base64url_decode(s)?;
     if bytes.len() != expected_bytes {
         return Err(Error::Format(format!(
             "decoded base64url length {} (expected {})",
@@ -225,7 +225,7 @@ impl Statement {
 
             for c in value.chars() {
                 let cp = c as u32;
-                if (cp < 0x20 && cp != 0x0a) || cp == 0x7f {
+                if cp < 0x20 || cp == 0x7f {
                     return Err(Error::Format(format!(
                         "line {}: control character U+{:04X} in value",
                         i + 1, cp
@@ -308,24 +308,17 @@ impl Statement {
     }
 
     pub fn canonical_body(&self) -> Vec<u8> {
-        // raw_lines: [origin, type, (parent), hash, time, key, sig]
-        // Canonical body: origin, type, (parent), hash, key
-        // (no time, no sig)
+        let origin_line = format!("origin: {}", PROTOCOL_VERSION);
+        let type_line = format!("type: {}", STATEMENT_TYPE);
         if self.parent_present {
-            let mut body = String::new();
-            body.push_str(&self.raw_lines[0]); body.push('\n');
-            body.push_str(&self.raw_lines[1]); body.push('\n');
-            body.push_str(&self.raw_lines[2]); body.push('\n');
-            body.push_str(&self.raw_lines[3]); body.push('\n');
-            body.push_str(&self.raw_lines[5]);
-            body.into_bytes()
+            let parent_line = format!("parent: {}", self.parent.as_deref().unwrap());
+            let hash_line = format!("hash: {}", self.hash);
+            let key_line = format!("key: {}", self.key_b64);
+            format!("{}\n{}\n{}\n{}\n{}", origin_line, type_line, parent_line, hash_line, key_line).into_bytes()
         } else {
-            let mut body = String::new();
-            body.push_str(&self.raw_lines[0]); body.push('\n');
-            body.push_str(&self.raw_lines[1]); body.push('\n');
-            body.push_str(&self.raw_lines[2]); body.push('\n');
-            body.push_str(&self.raw_lines[4]);
-            body.into_bytes()
+            let hash_line = format!("hash: {}", self.hash);
+            let key_line = format!("key: {}", self.key_b64);
+            format!("{}\n{}\n{}\n{}", origin_line, type_line, hash_line, key_line).into_bytes()
         }
     }
 
@@ -379,6 +372,13 @@ pub fn build_statement_with_algorithm(
     parent_hash: Option<&str>,
     algorithm: HashAlgorithm,
 ) -> Result<Statement> {
+    if (artifact_bytes.len() as u64) > crate::MAX_ARTIFACT_SIZE {
+        return Err(Error::Format(format!(
+            "artifact too large ({} bytes, max {})",
+            artifact_bytes.len(),
+            crate::MAX_ARTIFACT_SIZE
+        )));
+    }
     let alg_prefix = algorithm.to_string();
     let (hash_hex_str, hash_bytes_vec) = hash::hash_data(artifact_bytes, &algorithm);
     let hash_str = format!("{}:{}", alg_prefix, hash_hex_str);
@@ -481,12 +481,96 @@ pub fn verify_statement(stmt: &Statement, artifact_bytes: &[u8]) -> Result<()> {
     crypto::verify(&public_key, &canonical, &sig)
 }
 
+/// Verify a statement against a trusted public key.
+///
+/// Like `verify_bytes`, but additionally checks that the statement's public
+/// key matches the trusted key. This prevents an attacker from presenting a
+/// statement signed by their own key and getting VERIFIED in return.
+///
+/// # Arguments
+///
+/// * `statement_bytes` — The complete `.origin` file content
+/// * `artifact_bytes` — The artifact bytes to verify against
+/// * `trusted_public_key` — The trusted public key (32 bytes)
+///
+/// # Returns
+///
+/// * `Ok(())` — The statement is valid AND signed by the trusted key
+/// * `Err(Error::KeyMismatch)` — The statement's key doesn't match the trusted key
+/// * `Err(Error)` — Parsing, hash, or signature verification failed
+pub fn verify_against_key(
+    statement_bytes: &[u8],
+    artifact_bytes: &[u8],
+    trusted_public_key: &[u8; 32],
+) -> Result<()> {
+    let stmt = Statement::parse(statement_bytes)?;
+    if stmt.key_bytes != *trusted_public_key {
+        return Err(Error::KeyMismatch);
+    }
+    verify_statement(&stmt, artifact_bytes)
+}
+
+/// Verify a statement chain where all links must use the trusted public key.
+///
+/// Like `verify_chain`, but additionally checks that every statement in the
+/// chain (child and parent) uses the same trusted public key. This prevents
+/// key substitution attacks in provenance chains.
+///
+/// # Arguments
+///
+/// * `child_bytes` — The child statement bytes
+/// * `child_artifact_bytes` — The child artifact bytes
+/// * `parent_bytes` — Optional parent statement bytes (required if child has parent)
+/// * `parent_artifact_bytes` — Optional parent artifact bytes
+/// * `trusted_public_key` — The trusted public key for ALL links in the chain
+///
+/// # Returns
+///
+/// * `Ok(())` — The chain is valid AND all links use the trusted key
+/// * `Err(Error::KeyMismatch)` — Any link's key doesn't match the trusted key
+/// * `Err(Error)` — Parsing, hash, signature, or parent hash mismatch
+pub fn verify_chain_against_key(
+    child_bytes: &[u8],
+    child_artifact_bytes: &[u8],
+    parent_bytes: Option<&[u8]>,
+    parent_artifact_bytes: Option<&[u8]>,
+    trusted_public_key: &[u8; 32],
+) -> Result<()> {
+    let child = Statement::parse(child_bytes)?;
+    if child.key_bytes != *trusted_public_key {
+        return Err(Error::KeyMismatch);
+    }
+    verify_statement(&child, child_artifact_bytes)?;
+
+    if let Some(child_parent_hash) = &child.parent {
+        let parent_data = parent_bytes.ok_or(Error::MissingParent)?;
+        let parent_art = parent_artifact_bytes.ok_or(Error::MissingParent)?;
+        let parent = Statement::parse(parent_data)?;
+        if parent.key_bytes != *trusted_public_key {
+            return Err(Error::KeyMismatch);
+        }
+        verify_statement(&parent, parent_art)?;
+        if *child_parent_hash != parent.hash {
+            return Err(Error::ParentMismatch {
+                child_parent: child_parent_hash.clone(),
+                actual_parent: parent.hash.clone(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
 /// Verify a statement and optionally verify its parent statement.
 ///
 /// If the child statement has a `parent` field, `parent_bytes` and
 /// `parent_artifact_bytes` must be provided. The parent is verified against
 /// its artifact, and the child's parent field is checked against the parent's
 /// hash. If the child has no parent, the parent parameters are ignored.
+///
+/// NOTE: This function does NOT check the public key against a trusted key.
+/// Use `verify_against_key` or `verify_chain_against_key` if you need to
+/// ensure the statement was signed by a specific trusted key.
 pub fn verify_chain(
     child_bytes: &[u8],
     child_artifact_bytes: &[u8],

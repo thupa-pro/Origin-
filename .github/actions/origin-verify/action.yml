@@ -31,4 +31,8 @@ runs:
     - name: Verify statement
       shell: bash
       run: |
-        origin verify "${{ inputs.statement }}" "${{ inputs.artifact }}"
+        if [ -n "${{ inputs.public-key }}" ]; then
+          origin verify "${{ inputs.statement }}" "${{ inputs.artifact }}" --trusted-key "${{ inputs.public-key }}"
+        else
+          origin verify "${{ inputs.statement }}" "${{ inputs.artifact }}"
+        fi

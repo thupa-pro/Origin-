@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use origin_core::{
     base64_encode, build_statement, encode_statement, generate_keypair, hash,
-    verify_chain, SecretKey, Statement,
+    verify_chain, verify_chain_against_key, SecretKey, Statement,
 };
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -84,6 +84,9 @@ enum Commands {
         /// Path to the parent statement and artifact (for chain verification)
         #[arg(long, num_args = 2, value_names = ["STATEMENT", "ARTIFACT"])]
         parent: Option<Vec<PathBuf>>,
+        /// Path to a trusted public key file (base64url, 44 chars with padding)
+        #[arg(long)]
+        trusted_key: Option<PathBuf>,
     },
     /// Display a human-readable audit of a statement
     ///
@@ -121,7 +124,7 @@ fn load_secret_key(key_arg: &Option<String>) -> Result<SecretKey, String> {
 }
 
 fn decode_secret_key(s: &str) -> Result<SecretKey, String> {
-    let bytes = origin_core::base64_decode(s).map_err(|e| format!("invalid base64 key: {}", e))?;
+    let bytes = origin_core::base64url_decode(s).map_err(|e| format!("invalid base64 key: {}", e))?;
     SecretKey::from_bytes(&bytes).map_err(|e| e.to_string())
 }
 
@@ -242,6 +245,7 @@ fn main() {
             statement,
             artifact,
             parent,
+            trusted_key,
         } => {
             let stmt_data = match std::fs::read(&statement) {
                 Ok(d) => d,
@@ -256,6 +260,33 @@ fn main() {
                     eprintln!("error: cannot read '{}': {}", artifact.display(), e);
                     std::process::exit(1);
                 }
+            };
+
+            let trusted_key_bytes = if let Some(ref tk_path) = trusted_key {
+                let tk_data = match std::fs::read_to_string(tk_path) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("error: cannot read trusted key '{}': {}", tk_path.display(), e);
+                        std::process::exit(1);
+                    }
+                };
+                let trimmed = tk_data.trim().to_string();
+                let decoded = match origin_core::base64url_decode(&trimmed) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("error: invalid base64url in trusted key: {}", e);
+                        std::process::exit(1);
+                    }
+                };
+                if decoded.len() != 32 {
+                    eprintln!("error: trusted public key must decode to 32 bytes (got {})", decoded.len());
+                    std::process::exit(1);
+                }
+                let mut key = [0u8; 32];
+                key.copy_from_slice(&decoded);
+                Some(key)
+            } else {
+                None
             };
 
             let (parent_stmt_data, parent_art_data) = if let Some(ref args) = parent {
@@ -282,10 +313,20 @@ fn main() {
                 (None, None)
             };
 
-            match verify_chain(&stmt_data, &art_data, parent_stmt_data.as_deref(), parent_art_data.as_deref()) {
-                Ok(()) => {
-                    println!("VERIFIED");
-                }
+            let result = match trusted_key_bytes {
+                Some(tk) => verify_chain_against_key(
+                    &stmt_data, &art_data,
+                    parent_stmt_data.as_deref(), parent_art_data.as_deref(),
+                    &tk,
+                ),
+                None => verify_chain(
+                    &stmt_data, &art_data,
+                    parent_stmt_data.as_deref(), parent_art_data.as_deref(),
+                ),
+            };
+
+            match result {
+                Ok(()) => println!("VERIFIED"),
                 Err(e) => {
                     println!("FAILED: {}", e);
                     std::process::exit(1);
