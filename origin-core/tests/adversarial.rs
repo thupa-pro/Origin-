@@ -267,3 +267,17 @@ fn test_verification_error_types() {
     }
     let _ = verify_consistency(&tampered, data);
 }
+
+/// Verify with trusted key using consistent API.
+#[test]
+fn test_verify_trusted_key_roundtrip() {
+    use origin_core::verify;
+    let seed = [13u8; 32];
+    let secret = origin_core::SecretKey::from_bytes(&seed).unwrap();
+    let trusted = origin_core::generate_keypair_from_seed(&seed).public.0;
+    let stmt = build_statement(&secret, b"trusted test", 100, None).unwrap();
+    let enc = origin_core::encode_statement(&stmt);
+    assert!(verify(&enc, b"trusted test", &trusted).is_ok());
+}
+
+
