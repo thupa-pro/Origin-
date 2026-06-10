@@ -14,27 +14,11 @@
 
 Origin is a cryptographic provenance primitive. It creates a self-contained, verifiable statement that binds an artifact hash, a public key, and a signature into a portable proof of authorship or responsibility. Verification is deterministic, offline, and requires no external service.
 
-Origin answers exactly one question: *"Did the holder of this trusted public key create or endorse this exact artifact?"*
+Origin answers exactly one question: *"Did the holder of this public key create or endorse this exact artifact?"*
 
-The signature covers origin, type, parent (if present), hash, and key — but NOT the timestamp (advisory). If both the signature verifies and the public key is trusted, the statement is authentic. If the artifact changes, verification fails.
+If the signature verifies, the statement is authentic. If the artifact changes, verification fails.
 
-### Protocol Scope
-
-| Provides | Does NOT provide |
-|---|---|
-| Integrity | Identity |
-| Authenticity | Trust |
-| Provenance evidence | Key discovery / distribution |
-| Offline verification | Revocation / delegation |
-| Deterministic verification | Timestamp authority |
-| Auditable evidence | Certificate authorities |
-| | Blockchain consensus |
-| | Software supply-chain policy |
-| | Artifact storage |
-| | Encryption / compression |
-| | Networking |
-
-Origin is not a supply-chain framework, identity system, trust network, or governance layer. It is the primitive upon which those systems may be built. Any capability that can exist outside the primitive should remain outside the primitive. Complexity belongs in the ecosystem, not in Origin itself.
+Origin provides integrity, authenticity, provenance evidence, and offline deterministic verification. It does not provide identity, trust, key discovery, revocation, delegation, timestamp authority, certificate authorities, blockchain consensus, or any form of networking. Origin is the primitive upon which those systems may be built.
 
 ---
 
