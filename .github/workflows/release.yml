@@ -56,27 +56,36 @@ jobs:
     - run: cargo build --release --target x86_64-unknown-linux-gnu
       env:
         CARGO_TARGET_DIR: /tmp/origin-target
-    - name: Sign binary with Origin
+    - name: Sign binary with Origin (optional — requires ORIGIN_RELEASE_KEY secret)
+      continue-on-error: true
       run: |
-        echo "${{ secrets.ORIGIN_RELEASE_KEY }}" > /tmp/release.key
-        /tmp/origin-target/x86_64-unknown-linux-gnu/release/origin sign \
-          /tmp/origin-target/x86_64-unknown-linux-gnu/release/origin \
-          --key /tmp/release.key
-        rm -f /tmp/release.key
-      env:
-        ORIGIN_RELEASE_KEY: ${{ secrets.ORIGIN_RELEASE_KEY }}
-    - name: Update release provenance in docs
+        if [ -n "${{ secrets.ORIGIN_RELEASE_KEY }}" ]; then
+          echo "${{ secrets.ORIGIN_RELEASE_KEY }}" > /tmp/release.key
+          /tmp/origin-target/x86_64-unknown-linux-gnu/release/origin sign \
+            /tmp/origin-target/x86_64-unknown-linux-gnu/release/origin \
+            --key /tmp/release.key
+          rm -f /tmp/release.key
+        else
+          echo "ORIGIN_RELEASE_KEY not set — skipping binary signing"
+        fi
+    - name: Update release provenance in docs (optional)
+      continue-on-error: true
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git fetch origin main
         git checkout main
-        cp /tmp/origin-target/x86_64-unknown-linux-gnu/release/origin.origin docs/origin-linux-x86_64.origin
-        git add docs/origin-linux-x86_64.origin
-        git diff --cached --quiet || git commit -m "ci: update release provenance for ${{ github.ref_name }}"
-        git pull --rebase origin main
-        git push
+        if [ -f /tmp/origin-target/x86_64-unknown-linux-gnu/release/origin.origin ]; then
+          cp /tmp/origin-target/x86_64-unknown-linux-gnu/release/origin.origin docs/origin-linux-x86_64.origin
+          git add docs/origin-linux-x86_64.origin
+          git diff --cached --quiet || git commit -m "ci: update release provenance for ${{ github.ref_name }}"
+          git pull --rebase origin main
+          git push
+        else
+          echo "Signed binary not found — skipping provenance update"
+        fi
     - name: Update v1 tag
+      continue-on-error: true
       run: |
         git tag -f v1
         git push origin v1 --force
