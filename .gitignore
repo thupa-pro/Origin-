@@ -3,3 +3,4 @@
 *.key
 *.pub
 .DS_Store
+/sdk/typescript/bin/

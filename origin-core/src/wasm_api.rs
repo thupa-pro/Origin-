@@ -1,19 +1,17 @@
 #![allow(unsafe_code)]
 
-use alloc::boxed::Box;
-use alloc::vec;
+extern crate alloc;
 
 use crate::crypto::SecretKey;
-use crate::statement::{build_statement, encode_statement, verify_statement, Statement};
+use crate::statement::{build_statement, encode_statement, verify_statement};
+use crate::Statement;
 
 /// Allocate a buffer of `size` bytes in WASM linear memory.
 /// Returns a pointer that the caller must free with `origin_free_buffer`.
 #[unsafe(no_mangle)]
 pub extern "C" fn origin_alloc(size: usize) -> *mut u8 {
-    let mut buf = vec![0u8; size];
-    let ptr = buf.as_mut_ptr();
-    core::mem::forget(buf);
-    ptr
+    let layout = alloc::alloc::Layout::array::<u8>(size).unwrap();
+    unsafe { alloc::alloc::alloc_zeroed(layout) }
 }
 
 /// Parse and verify a .origin statement.
@@ -67,10 +65,16 @@ pub extern "C" fn origin_sign(
             return core::ptr::null_mut();
         }
     };
-    let mut encoded = encode_statement(&stmt);
-    encoded.shrink_to_fit();
+
+    let encoded = encode_statement(&stmt);
     let len = encoded.len();
-    let buf = encoded.leak().as_mut_ptr();
+    let layout = alloc::alloc::Layout::array::<u8>(len).unwrap();
+    let buf = unsafe { alloc::alloc::alloc(layout) };
+    if buf.is_null() {
+        unsafe { *out_len = 0 };
+        return core::ptr::null_mut();
+    }
+    unsafe { core::ptr::copy_nonoverlapping(encoded.as_ptr(), buf, len) };
     unsafe { *out_len = len };
     buf
 }
@@ -81,7 +85,6 @@ pub extern "C" fn origin_free_buffer(ptr: *mut u8, len: usize) {
     if ptr.is_null() {
         return;
     }
-    unsafe {
-        let _ = Box::from_raw(core::slice::from_raw_parts_mut(ptr, len));
-    }
+    let layout = alloc::alloc::Layout::array::<u8>(len).unwrap();
+    unsafe { alloc::alloc::dealloc(ptr, layout) }
 }

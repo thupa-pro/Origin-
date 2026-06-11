@@ -22,5 +22,5 @@ jobs:
       - run: cargo build
       - run: cargo test
       - run: cargo build -p origin-core --target wasm32-unknown-unknown
-      - run: cp target/wasm32-unknown-unknown/debug/origin_core.wasm sdk/typescript/bin/origin-core.wasm
+      - run: mkdir -p sdk/typescript/bin && cp target/wasm32-unknown-unknown/debug/origin_core.wasm sdk/typescript/bin/origin-core.wasm
       - run: node --test sdk/typescript/test.mjs
