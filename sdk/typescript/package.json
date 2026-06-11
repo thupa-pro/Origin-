@@ -28,7 +28,8 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "prepublishOnly": "cd ../.. && cargo build -p origin-core --target wasm32-unknown-unknown && cp target/wasm32-unknown-unknown/debug/origin_core.wasm sdk/typescript/bin/origin-core.wasm",
+    "build:wasm": "cd ../.. && cargo build -p origin-core --target wasm32-unknown-unknown --release && cp target/wasm32-unknown-unknown/release/origin_core.wasm sdk/typescript/bin/origin-core.wasm",
+    "prepublishOnly": "npm run build:wasm",
     "test": "node --test test.mjs"
   },
   "keywords": [

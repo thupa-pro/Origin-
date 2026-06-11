@@ -17,6 +17,7 @@ jobs:
         with:
           components: clippy, rustfmt
           targets: wasm32-unknown-unknown
+      - run: cargo install cbindgen --locked
       - uses: actions/cache@v4
         with:
           path: |
@@ -26,6 +27,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo deny check
       - run: cargo build
       - run: cargo test
       - run: cargo test --all-features
@@ -33,3 +35,5 @@ jobs:
       - run: cargo clippy --target wasm32-unknown-unknown --all-targets -- -D warnings
       - run: mkdir -p sdk/typescript/bin && cp target/wasm32-unknown-unknown/debug/origin_core.wasm sdk/typescript/bin/origin-core.wasm
       - run: node --test sdk/typescript/test.mjs
+      - run: cbindgen --config origin-core/cbindgen.toml --crate origin-core --output sdk/c/origin_core.h
+      - run: test -s sdk/c/origin_core.h
