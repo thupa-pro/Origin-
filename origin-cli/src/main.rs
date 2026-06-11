@@ -355,3 +355,39 @@ fn main() {
         },
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_decode_secret_key_valid() {
+        let key = decode_secret_key("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=").unwrap();
+        assert_eq!(key.0, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_decode_secret_key_wrong_length() {
+        let err = decode_secret_key("AA==").unwrap_err();
+        assert!(err.contains("32 bytes"));
+    }
+
+    #[test]
+    fn test_decode_secret_key_invalid_base64() {
+        let err = decode_secret_key("!!!").unwrap_err();
+        assert!(err.contains("invalid base64"));
+    }
+
+    #[test]
+    fn test_decode_secret_key_no_trim() {
+        let key = decode_secret_key("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=").unwrap();
+        assert_eq!(key.0, [0u8; 32]);
+    }
+
+    #[test]
+    fn test_current_timestamp_is_reasonable() {
+        let ts = current_timestamp();
+        assert!(ts > 1577836800, "timestamp {} seems too low", ts);
+        assert!(ts < 4102444800, "timestamp {} seems too high", ts);
+    }
+}

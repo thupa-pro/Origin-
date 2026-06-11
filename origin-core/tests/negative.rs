@@ -246,6 +246,24 @@ fn test_control_char_in_value() {
 }
 
 #[test]
+fn test_empty_key_name() {
+    let data = b"origin: v1\ntype: provenance\n: sha256:abc\ntime: 0\nkey: xxxx\nsig: xxxx\n";
+    assert_parse_fails(data, "empty key name");
+}
+
+#[test]
+fn test_trailing_whitespace_in_value() {
+    let data = b"origin: v1\ntype: provenance\nhash: sha256:abc\ntime: 0\nkey: xxxx  \nsig: xxxx\n";
+    assert_parse_fails(data, "trailing whitespace in value");
+}
+
+#[test]
+fn test_tab_after_separator() {
+    let data = b"origin: v1\ntype: provenance\nhash: sha256:abc\ntime: 0\nkey: \txxxx\nsig: xxxx\n";
+    assert_parse_fails(data, "tab after separator in value");
+}
+
+#[test]
 fn test_non_utf8() {
     let data = b"origin: v1\ntype: provenance\nhash: sha256:abc\ntime: 0\nkey: xxxx\nsig: \xff\xff\n";
     assert_parse_fails(data, "non-UTF-8");

@@ -113,3 +113,36 @@ pub fn base64url_decode(s: &str) -> std::result::Result<Vec<u8>, base64::DecodeE
 pub fn base64_decode(s: &str) -> std::result::Result<Vec<u8>, base64::DecodeError> {
     base64url_decode(s)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_base64_encode_roundtrip() {
+        let data = b"hello world";
+        let encoded = base64_encode(data);
+        assert_eq!(encoded, "aGVsbG8gd29ybGQ=");
+        let decoded = base64url_decode(&encoded).unwrap();
+        assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn test_base64_encode_empty() {
+        assert_eq!(base64_encode(b""), "");
+    }
+
+    #[test]
+    fn test_base64url_decode_invalid_char() {
+        let result = base64url_decode("!!!invalid!!!");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_deprecated_base64_decode() {
+        #[allow(deprecated)]
+        let result = base64_decode("aGVsbG8gd29ybGQ=");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), b"hello world");
+    }
+}

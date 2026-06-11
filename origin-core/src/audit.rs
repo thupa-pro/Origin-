@@ -63,22 +63,48 @@ mod tests {
         assert_eq!(timestamp_to_iso8601(1700000000), "2023-11-14T22:13:20Z");
     }
 
+    fn make_dummy_statement() -> Statement {
+        crate::statement::Statement::parse(
+            b"origin: v1\ntype: provenance\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n"
+        ).unwrap()
+    }
+
+    #[test]
+    fn test_audit_basic() {
+        let s = make_dummy_statement();
+        let result = audit(&s);
+        assert!(result.contains("Statement Audit"));
+        assert!(result.contains("SHA-256"));
+    }
+
+    #[test]
+    fn test_audit_with_parent_line() {
+        let s = crate::statement::Statement::parse(
+            b"origin: v1\ntype: provenance\nparent: sha256:1111111111111111111111111111111111111111111111111111111111111111\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n"
+        ).unwrap();
+        let result = audit(&s);
+        assert!(result.contains("Parent:"));
+    }
+
     #[test]
     fn test_audit_with_verdict_ok() {
-        let s = crate::statement::Statement::parse(
-            b"origin: v1\ntype: provenance\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n"
-        ).unwrap();
+        let s = make_dummy_statement();
         let result = audit_with_verdict(&s, &Ok(()));
         assert!(result.contains("VERIFIED"));
     }
 
     #[test]
     fn test_audit_with_verdict_err() {
-        let s = crate::statement::Statement::parse(
-            b"origin: v1\ntype: provenance\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n"
-        ).unwrap();
+        let s = make_dummy_statement();
         let result = audit_with_verdict(&s, &Err(Error::KeyMismatch));
         assert!(result.contains("FAILED"));
         assert!(result.contains("key mismatch"));
+    }
+
+    #[test]
+    fn test_timestamp_leap_year() {
+        assert_eq!(timestamp_to_iso8601(1700000000), "2023-11-14T22:13:20Z");
+        let mar1_2024 = 1709251200;
+        assert_eq!(timestamp_to_iso8601(mar1_2024), "2024-03-01T00:00:00Z");
     }
 }

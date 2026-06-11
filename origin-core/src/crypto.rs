@@ -132,4 +132,12 @@ mod tests {
         let err = Signature::from_bytes(&[0u8; 65]).unwrap_err();
         assert!(err.to_string().contains("64 bytes"));
     }
+
+    #[test]
+    fn test_generate_keypair_valid() {
+        let kp = generate_keypair();
+        assert_eq!(kp.secret.0.len(), 32);
+        assert_eq!(kp.public.0.len(), 32);
+        assert_ne!(kp.secret.0, [0u8; 32]);
+    }
 }
