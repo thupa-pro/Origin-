@@ -16,7 +16,6 @@
 
 use alloc::format;
 use alloc::string::{String, ToString};
-use alloc::vec;
 use alloc::vec::Vec;
 
 use hashbrown::HashSet;
@@ -286,36 +285,49 @@ pub fn build_statement(
     timestamp: u64,
 ) -> Result<Statement> {
     let hash_hex_str = hash::hash_hex(artifact_bytes);
-    let hash_str = format!("sha256:{}", hash_hex_str);
+    let hash_bytes = hash::hash_bytes(artifact_bytes);
+    build_statement_from_hash(secret, &hash_hex_str, &hash_bytes, timestamp)
+}
+
+/// Build a signed `.origin` statement from a pre-computed hash.
+///
+/// This is the streaming-friendly variant: compute the SHA-256 hash
+/// incrementally via [`hash::hash_reader`], then pass the raw + hex forms here.
+/// Avoids loading the entire artifact into memory.
+pub fn build_statement_from_hash(
+    secret: &crypto::SecretKey,
+    hash_hex_str: &str,
+    hash_bytes: &[u8; 32],
+    timestamp: u64,
+) -> Result<Statement> {
+    let hash_str = alloc::format!("sha256:{}", hash_hex_str);
 
     let kp = crypto::generate_keypair_from_seed(&secret.0);
     let public = &kp.public;
     let public_b64 = crate::base64_encode(&public.0);
 
-    let origin_line = format!("origin: {}", PROTOCOL_VERSION);
-    let hash_line = format!("hash: {}", hash_str);
-    let time_line = format!("time: {}", timestamp);
-    let key_line = format!("key: {}", public_b64);
+    let origin_line = alloc::format!("origin: {}", PROTOCOL_VERSION);
+    let hash_line = alloc::format!("hash: {}", hash_str);
+    let time_line = alloc::format!("time: {}", timestamp);
+    let key_line = alloc::format!("key: {}", public_b64);
 
-    let canonical = format!("{}\n{}\n{}\n{}", origin_line, hash_line, time_line, key_line);
+    let canonical = alloc::format!("{}\n{}\n{}\n{}", origin_line, hash_line, time_line, key_line);
 
     let sig = crypto::sign(secret, canonical.as_bytes());
     let sig_b64 = crate::base64_encode(&sig.0);
 
-    let hash_bytes = hash::hash_bytes(artifact_bytes);
-
-    let raw_lines = vec![
+    let raw_lines = alloc::vec![
         origin_line,
         hash_line,
         time_line,
         key_line,
-        format!("sig: {}", sig_b64),
+        alloc::format!("sig: {}", sig_b64),
     ];
 
     Ok(Statement {
         origin: PROTOCOL_VERSION.to_string(),
         hash: hash_str,
-        hash_bytes,
+        hash_bytes: *hash_bytes,
         time: timestamp,
         key_b64: public_b64,
         key_bytes: public.0,
@@ -340,11 +352,20 @@ pub fn encode_statement(stmt: &Statement) -> Vec<u8> {
 /// embedded in the statement.
 pub fn verify_statement(stmt: &Statement, artifact_bytes: &[u8]) -> Result<()> {
     let actual_hash = hash::hash_hex(artifact_bytes);
+    verify_statement_hash(stmt, &actual_hash)
+}
+
+/// Verify a signed statement against a pre-computed hash.
+///
+/// Streaming-friendly variant: compute the SHA-256 hash incrementally
+/// via [`hash::hash_reader`], then pass the hex form here.
+/// Avoids loading the entire artifact into memory.
+pub fn verify_statement_hash(stmt: &Statement, actual_hash_hex: &str) -> Result<()> {
     let expected_hash = &stmt.hash[7..];
-    if actual_hash != expected_hash {
+    if actual_hash_hex != expected_hash {
         return Err(Error::HashMismatch {
             expected: expected_hash.to_string(),
-            actual: actual_hash,
+            actual: actual_hash_hex.to_string(),
         });
     }
 

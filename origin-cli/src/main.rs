@@ -4,17 +4,24 @@
 //!
 //! This binary provides a command-line interface to the Origin protocol:
 //! signing, verification, audit, identity binding, and key generation.
+//! All I/O is streaming (no `fs::read` of artifact files); writes are atomic
+//! via tempfile + rename; errors use `miette` for structured diagnostics.
 
 #![deny(missing_docs)]
 
+use std::io::BufReader;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use origin_core::{
-    Statement, Verdict, audit, base64_encode, build_statement, encode_statement, generate_keypair,
-    hash::hash_hex, verify_statement,
+    Statement, Verdict, audit, base64_encode, build_statement_from_hash, encode_statement,
+    generate_keypair, hash_reader, verify_statement_hash,
 };
+
+fn to_err(e: origin_core::Error) -> miette::Report {
+    miette::miette!("{}", e)
+}
 
 /// Origin CLI entry point and subcommand dispatch.
 #[derive(Parser)]
@@ -81,15 +88,10 @@ enum Command {
     },
 }
 
-fn read_secret_key(path: &std::path::Path) -> origin_core::Result<origin_core::SecretKey> {
-    let bytes = std::fs::read(path).map_err(|e| {
-        origin_core::Error::Io(format!(
-            "failed to read secret key '{}': {}",
-            path.display(),
-            e
-        ))
-    })?;
-    origin_core::SecretKey::from_bytes(&bytes)
+fn read_secret_key(path: &std::path::Path) -> miette::Result<origin_core::SecretKey> {
+    let bytes = std::fs::read(path)
+        .map_err(|e| miette::miette!("failed to read secret key '{}': {}", path.display(), e))?;
+    origin_core::SecretKey::from_bytes(&bytes).map_err(to_err)
 }
 
 fn timestamp_now() -> u64 {
@@ -99,7 +101,33 @@ fn timestamp_now() -> u64 {
         .as_secs()
 }
 
-fn run(cli: Cli) -> Result<Verdict, origin_core::Error> {
+fn atomic_write(path: &std::path::Path, contents: &[u8]) -> miette::Result<()> {
+    let dir = path.parent().unwrap_or(std::path::Path::new("."));
+    let mut tmp = tempfile::NamedTempFile::new_in(dir)
+        .map_err(|e| miette::miette!("failed to create temp file in '{}': {}", dir.display(), e))?;
+    std::io::Write::write_all(&mut tmp, contents)
+        .map_err(|e| miette::miette!("failed to write temp file: {}", e))?;
+    tmp.persist(path)
+        .map_err(|e| miette::miette!("failed to rename temp file to '{}': {}", path.display(), e))?;
+    Ok(())
+}
+
+fn read_small_file(path: &std::path::Path) -> miette::Result<Vec<u8>> {
+    std::fs::read(path)
+        .map_err(|e| miette::miette!("failed to read '{}': {}", path.display(), e))
+}
+
+/// Stream-hash an artifact file, returning the raw hash bytes and hex string.
+fn hash_artifact(path: &std::path::Path) -> miette::Result<([u8; 32], String)> {
+    let file = std::fs::File::open(path)
+        .map_err(|e| miette::miette!("failed to open '{}': {}", path.display(), e))?;
+    let reader = BufReader::with_capacity(65536, file);
+    let hash = hash_reader(reader).map_err(to_err)?;
+    let hex_str = hex::encode(hash);
+    Ok((hash, hex_str))
+}
+
+fn run(cli: Cli) -> miette::Result<Verdict> {
     match cli.command {
         Command::Sign {
             artifact,
@@ -109,9 +137,9 @@ fn run(cli: Cli) -> Result<Verdict, origin_core::Error> {
         } => {
             let secret = read_secret_key(&key)?;
             let ts = time.unwrap_or_else(timestamp_now);
-            let artifact_bytes = std::fs::read(&artifact)
-                .map_err(|e| origin_core::Error::Io(format!("reading artifact: {}", e)))?;
-            let stmt = build_statement(&secret, &artifact_bytes, ts)?;
+            let (hash, hash_hex) = hash_artifact(&artifact)?;
+            let stmt = build_statement_from_hash(&secret, &hash_hex, &hash, ts).map_err(to_err)?;
+
             let out_path = output.unwrap_or_else(|| {
                 let mut p = artifact;
                 let name = p
@@ -121,10 +149,9 @@ fn run(cli: Cli) -> Result<Verdict, origin_core::Error> {
                 p.set_file_name(format!("{}.origin", name));
                 p
             });
+
             let encoded = encode_statement(&stmt);
-            std::fs::write(&out_path, &encoded).map_err(|e| {
-                origin_core::Error::Io(format!("writing '{}': {}", out_path.display(), e))
-            })?;
+            atomic_write(&out_path, &encoded)?;
             eprintln!("Wrote {}", out_path.display());
             Ok(Ok(()))
         }
@@ -134,53 +161,36 @@ fn run(cli: Cli) -> Result<Verdict, origin_core::Error> {
             origin,
             key,
         } => {
-            let statement_bytes = match std::fs::read(&origin) {
+            let statement_bytes = match read_small_file(&origin) {
                 Ok(b) => b,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    return Err(origin_core::Error::Unattested(format!(
+                Err(_) if !origin.exists() => {
+                    return Err(miette::miette!(
                         "no provenance file '{}' for artifact '{}'",
                         origin.display(),
                         artifact.display()
-                    )));
+                    ));
                 }
-                Err(e) => {
-                    return Err(origin_core::Error::Io(format!(
-                        "reading '{}': {}",
-                        origin.display(),
-                        e
-                    )));
-                }
+                Err(e) => return Err(e),
             };
-            let stmt = Statement::parse(&statement_bytes)?;
+            let stmt = Statement::parse(&statement_bytes).map_err(to_err)?;
 
             if let Some(trusted_key_b64) = key {
                 let trusted_bytes = origin_core::base64_decode(&trusted_key_b64)
-                    .map_err(|e| origin_core::Error::Format(e.to_string()))?;
+                    .map_err(|e| miette::miette!("invalid trusted key format: {}", e))?;
                 if trusted_bytes != stmt.key_bytes {
-                    return Err(origin_core::Error::Crypto(
-                        "public key mismatch: statement key does not match trusted key".into(),
+                    return Err(miette::miette!(
+                        "public key mismatch: statement key does not match trusted key"
                     ));
                 }
             }
 
-            let artifact_bytes = std::fs::read(&artifact).map_err(|e| {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    origin_core::Error::Unattested(format!(
-                        "artifact '{}' not found",
-                        artifact.display()
-                    ))
-                } else {
-                    origin_core::Error::Io(e.to_string())
-                }
-            })?;
-            Ok(verify_statement(&stmt, &artifact_bytes))
+            let (_hash, actual_hash_hex) = hash_artifact(&artifact)?;
+            Ok(verify_statement_hash(&stmt, &actual_hash_hex))
         }
 
         Command::Audit { origin } => {
-            let statement_bytes = std::fs::read(&origin).map_err(|e| {
-                origin_core::Error::Io(format!("reading '{}': {}", origin.display(), e))
-            })?;
-            let stmt = Statement::parse(&statement_bytes)?;
+            let statement_bytes = read_small_file(&origin)?;
+            let stmt = Statement::parse(&statement_bytes).map_err(to_err)?;
             println!("{}", audit::audit(&stmt));
             Ok(Ok(()))
         }
@@ -191,10 +201,13 @@ fn run(cli: Cli) -> Result<Verdict, origin_core::Error> {
             output,
         } => {
             let secret = read_secret_key(&key)?;
-            let identity_hash = hash_hex(identity.as_bytes());
+            let identity_bytes = identity.as_bytes();
+            let hash = origin_core::hash::hash_bytes(identity_bytes);
+            let hash_hex_str = hex::encode(hash);
             let ts = timestamp_now();
 
-            let stmt = build_statement(&secret, identity.as_bytes(), ts)?;
+            let stmt = build_statement_from_hash(&secret, &hash_hex_str, &hash, ts)
+                .map_err(to_err)?;
 
             let out_path = output.unwrap_or_else(|| {
                 let name = identity
@@ -210,11 +223,9 @@ fn run(cli: Cli) -> Result<Verdict, origin_core::Error> {
                 PathBuf::from(format!("{}.origin", name))
             });
             let encoded = encode_statement(&stmt);
-            std::fs::write(&out_path, &encoded).map_err(|e| {
-                origin_core::Error::Io(format!("writing '{}': {}", out_path.display(), e))
-            })?;
+            atomic_write(&out_path, &encoded)?;
             eprintln!("Identity binding: key claims identity '{}'", identity);
-            eprintln!("Hash: sha256:{}", identity_hash);
+            eprintln!("Hash: sha256:{}", hash_hex_str);
             eprintln!("Wrote {}", out_path.display());
             Ok(Ok(()))
         }
@@ -224,13 +235,9 @@ fn run(cli: Cli) -> Result<Verdict, origin_core::Error> {
             let secret_path = PathBuf::from(format!("{}.key", output));
             let public_path = PathBuf::from(format!("{}.pub", output));
 
-            std::fs::write(&secret_path, &kp.secret.0).map_err(|e| {
-                origin_core::Error::Io(format!("writing '{}': {}", secret_path.display(), e))
-            })?;
+            atomic_write(&secret_path, &kp.secret.0)?;
             let pub_b64 = base64_encode(&kp.public.0);
-            std::fs::write(&public_path, &pub_b64).map_err(|e| {
-                origin_core::Error::Io(format!("writing '{}': {}", public_path.display(), e))
-            })?;
+            atomic_write(&public_path, pub_b64.as_bytes())?;
 
             eprintln!("Secret key: {}", secret_path.display());
             eprintln!("Public key: {} ({})", pub_b64, public_path.display());
@@ -247,12 +254,8 @@ fn main() -> ExitCode {
             eprintln!("FAILED: {}", e);
             ExitCode::from(1)
         }
-        Err(origin_core::Error::Unattested(msg)) => {
-            eprintln!("UNATTESTED: {}", msg);
-            ExitCode::from(2)
-        }
-        Err(e) => {
-            eprintln!("ERROR: {}", e);
+        Err(report) => {
+            eprintln!("{:?}", report);
             ExitCode::from(1)
         }
     }

@@ -8,3 +8,6 @@ description = "Origin Protocol CLI — hash, sign, verify, audit"
 [dependencies]
 origin-core = { path = "../origin-core" }
 clap = { version = "4", features = ["derive"] }
+miette = { version = "7", features = ["fancy"] }
+tempfile = "3"
+hex = { version = "0.4", default-features = false }

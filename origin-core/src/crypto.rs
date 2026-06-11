@@ -7,6 +7,7 @@
 
 use alloc::string::ToString;
 
+use subtle::ConstantTimeEq;
 use zeroize::ZeroizeOnDrop;
 
 /// A Ed25519 key pair consisting of a [`SecretKey`] and [`PublicKey`].
@@ -60,8 +61,10 @@ impl PublicKey {
 }
 
 /// Reject the identity point (all-zero public key).
+/// Uses constant-time comparison via `subtle`.
 pub fn validate_public_key(pk: &[u8; 32]) -> crate::error::Result<()> {
-    if pk.iter().all(|&b| b == 0) {
+    let zero = [0u8; 32];
+    if pk.ct_eq(&zero).into() {
         return Err(crate::error::Error::Crypto(
             "invalid public key: identity point (all zeros)".into(),
         ));
@@ -119,6 +122,12 @@ pub fn verify(public: &PublicKey, message: &[u8], sig: &Signature) -> crate::err
     dalek_pub
         .verify(message, &dalek_sig)
         .map_err(|e| crate::error::Error::Crypto(e.to_string()))
+}
+
+/// Constant-time comparison of two byte slices.
+/// Returns true if they are equal, false otherwise (in constant time).
+pub fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    left.ct_eq(right).into()
 }
 
 #[cfg(test)]

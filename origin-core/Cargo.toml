@@ -20,12 +20,14 @@ zeroize = { version = "1", features = ["zeroize_derive"], default-features = fal
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1", default-features = false }
 hashbrown = { version = "0.15", default-features = false, features = ["default-hasher", "alloc"] }
+subtle = { version = "2", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 getrandom = { version = "0.2", default-features = false }
 
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false }
+proptest = "1"
 
 [[bench]]
 name = "verify"

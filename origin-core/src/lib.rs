@@ -30,14 +30,19 @@ pub use binary::ProofOfOrigin;
 pub use crypto::generate_keypair;
 /// Re-export cryptographic key and signature types.
 pub use crypto::{
-    generate_keypair_from_seed, validate_public_key, Keypair, PublicKey, SecretKey, Signature,
+    constant_time_eq, generate_keypair_from_seed, validate_public_key, Keypair, PublicKey,
+    SecretKey, Signature,
 };
 /// Re-export [`Error`] and [`Result`] from the `error` module.
 pub use error::{Error, Result};
 /// Re-export [`hash_bytes`] from the `hash` module.
 pub use hash::hash_bytes;
 /// Re-export statement types and functions.
-pub use statement::{build_statement, encode_statement, verify_statement, Statement};
+pub use hash::hash_reader;
+pub use statement::{
+    build_statement, build_statement_from_hash, encode_statement, verify_statement,
+    verify_statement_hash, Statement,
+};
 
 /// A specialized [`Result`] type for verification operations.
 pub type Verdict = core::result::Result<(), Error>;

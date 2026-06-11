@@ -7,6 +7,7 @@ allow = [
     "Zlib",
     "Unicode-3.0",
     "NCSA",
+    "ISC",
 ]
 confidence-threshold = 0.8
 
@@ -17,8 +18,8 @@ ignore = true
 multiple-versions = "deny"
 wildcards = "allow"
 skip = [
-    # libfuzzer-sys pulls in getrandom 0.3 via cc → jobserver
     { crate = "getrandom@0.3.4", reason = "only used by libfuzzer-sys build dep" },
+    { crate = "unicode-width@0.1.14", reason = "old unicode-width pulled by miette deps" },
 ]
 
 [advisories]
