@@ -363,3 +363,32 @@ fn test_verify_wrong_parent() {
         err
     );
 }
+
+// ── Statement accessor methods ──
+
+#[test]
+fn test_statement_has_parent_true() {
+    let s = Statement::parse(&valid_with_parent()).unwrap();
+    assert!(s.has_parent(), "statement with parent should return true");
+}
+
+#[test]
+fn test_statement_has_parent_false() {
+    let s = Statement::parse(&valid_statement()).unwrap();
+    assert!(!s.has_parent(), "statement without parent should return false");
+}
+
+#[test]
+fn test_statement_parent_hash_hex_with_parent() {
+    let s = Statement::parse(&valid_with_parent()).unwrap();
+    assert_eq!(
+        s.parent_hash_hex(),
+        Some("sha256:1111111111111111111111111111111111111111111111111111111111111111")
+    );
+}
+
+#[test]
+fn test_statement_parent_hash_hex_no_parent() {
+    let s = Statement::parse(&valid_statement()).unwrap();
+    assert_eq!(s.parent_hash_hex(), None);
+}

@@ -26,6 +26,7 @@ pub fn hash_file(path: &std::path::Path) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
 
     #[test]
     fn test_hash_hex_known_values() {
@@ -43,5 +44,14 @@ mod tests {
     fn test_hash_file_not_found() {
         let err = hash_file(std::path::Path::new("/nonexistent/file.bin")).unwrap_err();
         assert!(err.to_string().contains("I/O error"));
+    }
+
+    #[test]
+    fn test_hash_file_success() {
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(b"hello world").unwrap();
+        let path = tmp.path().to_path_buf();
+        let result = hash_file(&path).unwrap();
+        assert_eq!(result, "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
     }
 }

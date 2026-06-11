@@ -140,4 +140,53 @@ mod tests {
         assert_eq!(kp.public.0.len(), 32);
         assert_ne!(kp.secret.0, [0u8; 32]);
     }
+
+    #[test]
+    fn test_sign_and_verify_direct() {
+        let seed = [42u8; 32];
+        let secret = SecretKey::from_bytes(&seed).unwrap();
+        let public = PublicKey::from_bytes(&[200u8; 32]).unwrap();
+        let msg = b"direct sign/verify test";
+        let sig = sign(&secret, msg);
+        assert_eq!(sig.0.len(), 64);
+        let result = verify(&public, msg, &sig);
+        assert!(result.is_err(), "wrong public key must fail");
+    }
+
+    #[test]
+    fn test_sign_and_verify_correct_key() {
+        let seed = [99u8; 32];
+        let secret = SecretKey::from_bytes(&seed).unwrap();
+        let pair = generate_keypair_from_seed(&seed);
+        let msg = b"correct key test";
+        let sig = sign(&secret, msg);
+        let result = verify(&pair.public, msg, &sig);
+        assert!(result.is_ok(), "correct key must verify");
+    }
+
+    #[test]
+    fn test_sign_and_verify_wrong_message() {
+        let seed = [88u8; 32];
+        let secret = SecretKey::from_bytes(&seed).unwrap();
+        let pair = generate_keypair_from_seed(&seed);
+        let sig = sign(&secret, b"original message");
+        let result = verify(&pair.public, b"wrong message", &sig);
+        assert!(result.is_err(), "wrong message must fail");
+    }
+
+    #[test]
+    fn test_sign_deterministic() {
+        let seed = [55u8; 32];
+        let secret = SecretKey::from_bytes(&seed).unwrap();
+        let msg = b"deterministic test";
+        let sig1 = sign(&secret, msg);
+        let sig2 = sign(&secret, msg);
+        assert_eq!(sig1, sig2, "signature must be deterministic");
+    }
+
+    #[test]
+    fn test_public_key_as_bytes() {
+        let key = PublicKey([7u8; 32]);
+        assert_eq!(key.as_bytes(), &[7u8; 32]);
+    }
 }
