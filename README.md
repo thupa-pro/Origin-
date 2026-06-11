@@ -41,7 +41,10 @@ curl -sL https://github.com/thupa-pro/Origin/releases/latest/download/origin-lin
 chmod +x origin && sudo mv origin /usr/local/bin/
 
 # Homebrew (macOS / Linux)
-brew install thupa-pro/Origin/origin
+brew install --formula https://raw.githubusercontent.com/thupa-pro/Origin/main/Formula/origin.rb
+
+# Or with a custom tap (once set up):
+# brew install thupa-pro/Origin/origin
 
 # GitHub Action (for your CI pipeline)
 # See .github/actions/origin-verify/action.yml

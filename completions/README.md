@@ -23,6 +23,21 @@ cp completions/origin.zsh /usr/share/zsh/site-functions/_origin
 cp completions/origin.fish ~/.config/fish/completions/
 ```
 
+## Man Page
+
+The man page at `docs/origin.1` covers all commands and options. To install:
+
+```bash
+make install-man   # requires sudo for /usr/local/share/man
+```
+
+Or manually:
+
+```bash
+gzip -c docs/origin.1 | sudo tee /usr/local/share/man/man1/origin.1.gz > /dev/null
+sudo mandb -q
+```
+
 ## Generating Completions
 
 If you have the `origin` binary built, you can regenerate completions:
