@@ -1,4 +1,6 @@
-import { readFileSync, writeFileSync } from "node:fs";
+// SPDX-License-Identifier: MIT
+
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 

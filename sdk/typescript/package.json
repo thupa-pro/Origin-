@@ -1,7 +1,8 @@
 {
   "name": "origin-sdk",
   "version": "1.0.0",
-  "description": "Origin Protocol — TypeScript SDK",
+  "description": "Origin Protocol — TypeScript SDK for cryptographic provenance verification",
+  "license": "MIT",
   "type": "module",
   "main": "./src/index.mjs",
   "types": "./src/index.d.ts",
@@ -14,5 +15,28 @@
   "files": [
     "src",
     "bin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thupa-pro/Origin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/thupa-pro/Origin/issues"
+  },
+  "homepage": "https://github.com/thupa-pro/Origin#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "prepublishOnly": "cd ../.. && cargo build -p origin-core --target wasm32-unknown-unknown && cp target/wasm32-unknown-unknown/debug/origin_core.wasm sdk/typescript/bin/origin-core.wasm",
+    "test": "node --test test.mjs"
+  },
+  "keywords": [
+    "origin",
+    "provenance",
+    "cryptography",
+    "ed25519",
+    "wasm",
+    "verification"
   ]
 }

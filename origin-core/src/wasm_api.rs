@@ -1,4 +1,4 @@
-#![allow(unsafe_code)]
+// SPDX-License-Identifier: MIT
 
 extern crate alloc;
 
@@ -8,6 +8,7 @@ use crate::Statement;
 
 /// Allocate a buffer of `size` bytes in WASM linear memory.
 /// Returns a pointer that the caller must free with `origin_free_buffer`.
+#[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub extern "C" fn origin_alloc(size: usize) -> *mut u8 {
     let layout = alloc::alloc::Layout::array::<u8>(size).unwrap();
@@ -16,6 +17,7 @@ pub extern "C" fn origin_alloc(size: usize) -> *mut u8 {
 
 /// Parse and verify a .origin statement.
 /// Returns 0 on success, non-zero on failure.
+#[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub extern "C" fn origin_verify(
     statement_ptr: *const u8,
@@ -39,6 +41,7 @@ pub extern "C" fn origin_verify(
 /// Sign an artifact and return the encoded .origin statement as bytes.
 /// The returned buffer must be freed with `origin_free_buffer`.
 /// On failure, returns null and sets `out_len` to 0.
+#[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub extern "C" fn origin_sign(
     secret_ptr: *const u8,
@@ -80,6 +83,7 @@ pub extern "C" fn origin_sign(
 }
 
 /// Free a buffer previously returned by `origin_sign` or `origin_alloc`.
+#[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub extern "C" fn origin_free_buffer(ptr: *mut u8, len: usize) {
     if ptr.is_null() {

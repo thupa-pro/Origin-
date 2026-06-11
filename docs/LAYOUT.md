@@ -78,7 +78,9 @@ sig: <base64url>            →   signature bytes
 
 The reserved fields (`reserved` and `reserved2`) are for future protocol extensions:
 
-- `reserved` (1 byte): Protocol flags, hash agility selector, or compression hint.
+- `reserved` (1 byte): Reserved for future use. Must be `0x00`.
 - `reserved2` (118 bytes): Future field additions. Must be zero in this version.
 
 Applications MUST reject non-zero reserved bytes to ensure forward compatibility.
+
+> Copyright (c) 2026 Origin Protocol. MIT licensed.

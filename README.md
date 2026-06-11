@@ -88,7 +88,7 @@ Origin is **1 protocol + N services**. This repo contains the protocol only.
 | L1 | TypeScript SDK | ✅ |
 | L2–L5 | Rulebooks, compliance, payments, identity | Separate services |
 
-See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the system design.
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for system design, [LAYOUT.md](docs/LAYOUT.md) for binary format, [IDENTITY.md](docs/IDENTITY.md) for identity binding.
 
 ## Crate Structure
 
@@ -109,6 +109,8 @@ origin-core/          # L1 library (no_std + alloc)
 origin-cli/           # L1 CLI binary
 sdk/typescript/       # TypeScript SDK wrapping origin-core.wasm
 ```
+
+> Copyright (c) 2026 Origin Protocol. MIT licensed.
 
 ## License
 

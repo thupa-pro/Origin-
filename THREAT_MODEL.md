@@ -102,3 +102,5 @@ An adversary who can modify the artifact file between step 2 and step 3 can bypa
 | Verifier trusts wrong public key | Key distribution is external to the protocol. |
 | Two signers share the same key | A key is a cryptographic identity, not a person. |
 | Statement is deleted | No durability guarantees. Backups are the user's responsibility. |
+
+> Copyright (c) 2026 Origin Protocol. MIT licensed.

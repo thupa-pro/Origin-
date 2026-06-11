@@ -1,9 +1,17 @@
+// SPDX-License-Identifier: MIT
+
+//! Binary (packed, 256-byte) serialization of a Proof of Origin.
+//!
+//! Re-exports [`ProofOfOrigin`] from a private `layout` module and provides
+//! construction, parsing, and conversion methods.
+
 use alloc::format;
 
 use crate::crypto;
 use crate::error::{Error, Result};
 use crate::statement::Statement;
 
+/// 256-byte fixed-width binary representation of a Proof of Origin.
 pub use layout::ProofOfOrigin;
 
 mod layout {
@@ -20,12 +28,19 @@ mod layout {
     #[repr(C, packed)]
     #[derive(Copy, Clone)]
     pub struct ProofOfOrigin {
+        /// Protocol version byte (must be `0x01`).
         pub version: u8,
+        /// Reserved byte (must be `0x00`).
         pub reserved: u8,
+        /// Unix timestamp encoded as big-endian u64.
         pub timestamp: [u8; 8],
+        /// SHA-256 hash (32 bytes).
         pub hash: [u8; 32],
+        /// Ed25519 public key (32 bytes).
         pub pubkey: [u8; 32],
+        /// Ed25519 signature (64 bytes).
         pub signature: [u8; 64],
+        /// Reserved padding, must be zero-filled (118 bytes).
         pub reserved2: [u8; 118],
     }
 

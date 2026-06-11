@@ -1,3 +1,19 @@
+// SPDX-License-Identifier: MIT
+
+//! Parsing, building, encoding, and verifying [.origin text format](https://origin.dev) statements.
+//!
+//! A `.origin` statement records a cryptographic attestation that a particular
+//! artifact (identified by its SHA-256 hash) existed at a given timestamp.
+//! The format consists of five key-value lines:
+//!
+//! ```text
+//! origin: v1
+//! hash: sha256:<64-lowercase-hex>
+//! time: <unix-epoch-seconds>
+//! key: <base64url-encoded-public-key>
+//! sig: <base64url-encoded-signature>
+//! ```
+
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;
@@ -17,16 +33,29 @@ const EXPECTED_LINES: usize = 5;
 const VALID_KEYS: [&str; 5] = ["origin", "hash", "time", "key", "sig"];
 const HEX_CHARS: &[u8] = b"0123456789abcdef";
 
+/// A parsed `.origin` statement.
+///
+/// Contains the five fields from the text format plus decoded binary
+/// representations and the original raw lines for canonical serialisation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Statement {
+    /// Protocol version string (e.g. `"v1"`).
     pub origin: String,
+    /// Full hash field from the statement (e.g. `"sha256:<hex>"`).
     pub hash: String,
+    /// Decoded 32-byte SHA-256 hash.
     pub hash_bytes: [u8; 32],
+    /// Unix-epoch timestamp in seconds.
     pub time: u64,
+    /// Base64url-encoded public key.
     pub key_b64: String,
+    /// Decoded 32-byte public key.
     pub key_bytes: [u8; 32],
+    /// Base64url-encoded signature.
     pub sig_b64: String,
+    /// Decoded 64-byte signature.
     pub sig_bytes: [u8; 64],
+    /// Original key-value lines as they appeared in the source text.
     pub raw_lines: Vec<String>,
 }
 
@@ -59,6 +88,10 @@ fn validate_base64url(s: &str, expected_len: usize) -> Result<Vec<u8>> {
 }
 
 impl Statement {
+    /// Parse a `.origin` statement from raw UTF-8 bytes.
+    ///
+    /// Validates the structure, encoding, and cryptographic key material
+    /// without verifying the signature (use [`verify_statement`] for that).
     pub fn parse(data: &[u8]) -> Result<Self> {
         let text = core::str::from_utf8(data).map_err(|_| Error::Format("not valid UTF-8".into()))?;
 
@@ -182,7 +215,7 @@ impl Statement {
         let hash_hex = &hash_val[hash_prefix.len()..];
         validate_hex_lowercase(hash_hex, 64)?;
         let hash_bytes =
-            hex::decode(hash_hex).map_err(|_| Error::Format("invalid hex encoding".into()))?;
+            hex::decode(hash_hex).map_err(|e| Error::Format(alloc::format!("invalid hex: {}", e)))?;
         let mut hb = [0u8; 32];
         hb.copy_from_slice(&hash_bytes);
 
@@ -228,6 +261,8 @@ impl Statement {
         })
     }
 
+    /// Return the canonical body (first four lines, no trailing newline)
+    /// that the signature covers.
     pub fn canonical_body(&self) -> Vec<u8> {
         let mut body = String::new();
         body.push_str(&self.raw_lines[0]);
@@ -241,6 +276,10 @@ impl Statement {
     }
 }
 
+/// Build a signed `.origin` statement for an artifact.
+///
+/// Hashes the artifact, derives the keypair from `secret`, constructs the
+/// canonical body, and appends the signature.
 pub fn build_statement(
     secret: &crypto::SecretKey,
     artifact_bytes: &[u8],
@@ -286,14 +325,19 @@ pub fn build_statement(
     })
 }
 
+/// Encode a `Statement` back into the `.origin` text format as bytes.
 pub fn encode_statement(stmt: &Statement) -> Vec<u8> {
     format!(
-        "{}\n{}\n{}\n{}\nsig: {}\n",
-        stmt.raw_lines[0], stmt.raw_lines[1], stmt.raw_lines[2], stmt.raw_lines[3], stmt.sig_b64,
+        "{}\n{}\n{}\n{}\n{}\n",
+        stmt.raw_lines[0], stmt.raw_lines[1], stmt.raw_lines[2], stmt.raw_lines[3], stmt.raw_lines[4],
     )
     .into_bytes()
 }
 
+/// Verify that a signed statement matches an artifact.
+///
+/// Checks the SHA-256 hash and the Ed25519 signature using the public key
+/// embedded in the statement.
 pub fn verify_statement(stmt: &Statement, artifact_bytes: &[u8]) -> Result<()> {
     let actual_hash = hash::hash_hex(artifact_bytes);
     let expected_hash = &stmt.hash[7..];

@@ -37,3 +37,5 @@ The following are explicitly out of scope for the Origin protocol.
 ## Why These Boundaries
 
 Every non-goal removes complexity, attack surface, and maintenance burden. The protocol is designed to be the smallest possible cryptographic primitive that provides verifiable provenance. Everything else is layered on top by the ecosystem, not the protocol.
+
+> Copyright (c) 2026 Origin Protocol. MIT licensed.

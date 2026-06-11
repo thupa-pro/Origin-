@@ -6,7 +6,7 @@ Origin is designed as a minimal protocol (L1) with independent services (L2–L5
 
 **Repository:** `origin` (this repo)  
 **Crates:** `origin-core` (`no_std` library), `origin-cli` (CLI binary)  
-**SDKs:** TypeScript (WASM), Python (PyO3 — future)  
+**SDKs:** TypeScript (WASM)  
 **Constraints:** No network, no tokens, no identity system.  
 **Formats:** 5-line `.origin` text (RFC-0001.md), 256-byte fixed-width binary (LAYOUT.md).  
 **Stability:** The protocol is frozen. Only security fixes.
@@ -92,3 +92,5 @@ The protocol is free. Services monetize independently:
 | L3 | Free for basic use | Enterprise SaaS ($2k–$20k/mo) |
 | L4 | Free for individuals | 0.5%–1.5% transaction fee |
 | L5 | Free for individuals | Enterprise SaaS ($5k–$50k/mo) |
+
+> Copyright (c) 2026 Origin Protocol. MIT licensed.

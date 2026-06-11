@@ -1,16 +1,30 @@
+// SPDX-License-Identifier: MIT
+
+//! Error types and results for the Origin provenance library.
+
 use core::fmt;
 
+/// Errors that can occur during provenance statement operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
+    /// A generic error message.
     Message(alloc::string::String),
+    /// An error in statement format or parsing.
     Format(alloc::string::String),
+    /// A cryptographic operation error.
     Crypto(alloc::string::String),
+    /// A hash mismatch between expected and actual values.
     HashMismatch {
+        /// The expected hash value.
         expected: alloc::string::String,
+        /// The actual computed hash value.
         actual: alloc::string::String,
     },
+    /// An I/O error (available with the `std` feature).
     Io(alloc::string::String),
+    /// No provenance found for the given artifact.
     Unattested(alloc::string::String),
+    /// Trailing content found after the final statement line.
     TrailingContent(alloc::string::String),
 }
 
@@ -48,4 +62,5 @@ impl From<std::io::Error> for Error {
     }
 }
 
+/// A specialized [`Result`] type for the Origin provenance library.
 pub type Result<T> = core::result::Result<T, Error>;

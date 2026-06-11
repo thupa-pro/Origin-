@@ -35,3 +35,5 @@ It says: "At this time, the holder of this public key acknowledges this artifact
 - Not a CI/CD platform
 
 Origin is one primitive, well defined, available as a library and a CLI, usable anywhere someone needs to ask "where did this come from?"
+
+> Copyright (c) 2026 Origin Protocol. MIT licensed.

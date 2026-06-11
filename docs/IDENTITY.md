@@ -53,3 +53,5 @@ Identity binding does not authenticate the identity. It proves that a particular
 | New crypto? | No — standard Ed25519 signing |
 | Backward compatible? | Yes — any v1 verifier validates identity statements |
 | Required for verification? | No — identity is orthogonal to provenance |
+
+> Copyright (c) 2026 Origin Protocol. MIT licensed.

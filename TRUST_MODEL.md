@@ -47,3 +47,5 @@ Verifier's environment
 - A compromised signing key cannot be revoked at the protocol level. Stop trusting statements signed after the compromise date.
 - A dishonest signer can lie about timestamps. This is by design. Timestamp verification is a separate problem.
 - A verifier who trusts the wrong public key will accept false statements. Key distribution is the verifier's responsibility.
+
+> Copyright (c) 2026 Origin Protocol. MIT licensed.

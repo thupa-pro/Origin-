@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
@@ -74,7 +76,7 @@ export async function sign(secretKey, artifactBytes, timestamp) {
 
   // Read output length and result bytes with FRESH buffer views
   const freshMem = new Uint8Array(wasm.memory.buffer);
-  const outLen = new Uint32Array(wasm.memory.buffer, outLenPtr, 1)[0];
+  const outLen = new Uint32Array(freshMem.buffer, outLenPtr, 1)[0];
   const result = freshMem.slice(resultPtr, resultPtr + outLen);
 
   wasm.origin_free_buffer(resultPtr, outLen);

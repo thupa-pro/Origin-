@@ -16,11 +16,20 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: clippy, rustfmt
-      - run: rustup target add wasm32-unknown-unknown
+          targets: wasm32-unknown-unknown
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo fmt --check
-      - run: cargo clippy -- -D warnings
+      - run: cargo clippy --all-targets -- -D warnings
       - run: cargo build
       - run: cargo test
+      - run: cargo test --all-features
       - run: cargo build -p origin-core --target wasm32-unknown-unknown
+      - run: cargo clippy --target wasm32-unknown-unknown --all-targets -- -D warnings
       - run: mkdir -p sdk/typescript/bin && cp target/wasm32-unknown-unknown/debug/origin_core.wasm sdk/typescript/bin/origin-core.wasm
       - run: node --test sdk/typescript/test.mjs

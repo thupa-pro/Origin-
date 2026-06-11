@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 use origin_core::crypto::{self, PublicKey, SecretKey};
 use origin_core::error::Error;
 use origin_core::statement::{Statement, build_statement, encode_statement, verify_statement};

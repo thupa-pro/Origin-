@@ -19,3 +19,5 @@ The gap is a protocol that binds an artifact to a claim, cryptographically, in a
 No network. No database. No service. No token. No blockchain.
 
 A file and a signature.
+
+> Copyright (c) 2026 Origin Protocol. MIT licensed.

@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: MIT
+
+//! Human-readable audit formatting for Origin statements.
+//!
+//! Produces formatted audit strings with optional verification verdict.
+
 use alloc::format;
 use alloc::string::String;
 
@@ -22,16 +28,17 @@ fn timestamp_to_iso8601(ts: u64) -> String {
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
     let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if m <= 2 { y + 1 } else { y };
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { y + 1 } else { y };
 
     let h = day_secs / 3600;
     let mi = (day_secs % 3600) / 60;
     let s = day_secs % 60;
 
-    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, m, d, h, mi, s)
+    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", year, month, d, h, mi, s)
 }
 
+/// Format a [`Statement`] into a human-readable audit string.
 pub fn audit(statement: &Statement) -> String {
     let iso = timestamp_to_iso8601(statement.time);
     format!(
@@ -45,6 +52,7 @@ pub fn audit(statement: &Statement) -> String {
     )
 }
 
+/// Format a [`Statement`] with a verification verdict into a human-readable audit string.
 pub fn audit_with_verdict(statement: &Statement, verify_result: &Result<()>) -> String {
     let verdict = match verify_result {
         Ok(()) => "VERIFIED",

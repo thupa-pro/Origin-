@@ -1,3 +1,12 @@
+// SPDX-License-Identifier: MIT
+
+//! Origin CLI — cryptographic provenance for digital artifacts.
+//!
+//! This binary provides a command-line interface to the Origin protocol:
+//! signing, verification, audit, identity binding, and key generation.
+
+#![deny(missing_docs)]
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -7,6 +16,7 @@ use origin_core::{
     hash::hash_hex, verify_statement,
 };
 
+/// Origin CLI entry point and subcommand dispatch.
 #[derive(Parser)]
 #[command(
     name = "origin",
@@ -18,6 +28,7 @@ struct Cli {
     command: Command,
 }
 
+/// Available subcommands for the Origin CLI.
 #[derive(Subcommand)]
 enum Command {
     /// Hash and sign an artifact, producing a .origin statement

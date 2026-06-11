@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * Verify a .origin statement against an artifact.
  * @param statementBytes - The .origin statement as bytes
