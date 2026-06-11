@@ -1,14 +1,15 @@
+use alloc::format;
+use alloc::string::String;
+
 use crate::error::Result;
 use crate::statement::Statement;
 
 fn timestamp_to_iso8601(ts: u64) -> String {
-    // Compute ISO 8601 from unix timestamp
     let secs_per_day: u64 = 86400;
     let days = ts / secs_per_day;
     let day_secs = ts % secs_per_day;
 
-    // Rata die days since 1970-01-01
-    let rata_die = days as i64 + 719468; // days since 0000-03-01
+    let rata_die = days as i64 + 719468;
 
     let era = if rata_die >= 0 {
         rata_die

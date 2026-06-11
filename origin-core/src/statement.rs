@@ -1,3 +1,10 @@
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
+
+use hashbrown::HashSet;
+
 use crate::crypto;
 use crate::error::{Error, Result};
 use crate::hash;
@@ -53,8 +60,7 @@ fn validate_base64url(s: &str, expected_len: usize) -> Result<Vec<u8>> {
 
 impl Statement {
     pub fn parse(data: &[u8]) -> Result<Self> {
-        let text =
-            std::str::from_utf8(data).map_err(|_| Error::Format("not valid UTF-8".into()))?;
+        let text = core::str::from_utf8(data).map_err(|_| Error::Format("not valid UTF-8".into()))?;
 
         if data.starts_with(b"\xef\xbb\xbf") {
             return Err(Error::Format("BOM not allowed".into()));
@@ -135,8 +141,7 @@ impl Statement {
                 if (cp < 0x20 && cp != 0x0a) || cp == 0x7f {
                     return Err(Error::Format(format!(
                         "line {}: control character U+{:04X} in value",
-                        i + 1,
-                        cp
+                        i + 1, cp
                     )));
                 }
             }
@@ -144,14 +149,12 @@ impl Statement {
             fields.push((key, value));
         }
 
-        let mut seen_keys = std::collections::HashSet::new();
+        let mut seen_keys = HashSet::new();
         for (i, (key, _)) in fields.iter().enumerate() {
             if *key != VALID_KEYS[i] {
                 return Err(Error::Format(format!(
                     "line {}: expected key '{}', got '{}'",
-                    i + 1,
-                    VALID_KEYS[i],
-                    key
+                    i + 1, VALID_KEYS[i], key
                 )));
             }
             if !seen_keys.insert(key) {
@@ -255,10 +258,7 @@ pub fn build_statement(
     let time_line = format!("time: {}", timestamp);
     let key_line = format!("key: {}", public_b64);
 
-    let canonical = format!(
-        "{}\n{}\n{}\n{}",
-        origin_line, hash_line, time_line, key_line
-    );
+    let canonical = format!("{}\n{}\n{}\n{}", origin_line, hash_line, time_line, key_line);
 
     let sig = crypto::sign(secret, canonical.as_bytes());
     let sig_b64 = crate::base64_encode(&sig.0);

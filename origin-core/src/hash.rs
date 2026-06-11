@@ -1,7 +1,5 @@
 use sha2::{Digest, Sha256};
 
-use crate::error::Result;
-
 pub fn hash_bytes(data: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(data);
@@ -11,11 +9,12 @@ pub fn hash_bytes(data: &[u8]) -> [u8; 32] {
     hash
 }
 
-pub fn hash_hex(data: &[u8]) -> String {
+pub fn hash_hex(data: &[u8]) -> alloc::string::String {
     hex::encode(hash_bytes(data))
 }
 
-pub fn hash_file(path: &std::path::Path) -> Result<String> {
+#[cfg(feature = "std")]
+pub fn hash_file(path: &std::path::Path) -> crate::error::Result<alloc::string::String> {
     let data = std::fs::read(path)?;
     Ok(hash_hex(&data))
 }

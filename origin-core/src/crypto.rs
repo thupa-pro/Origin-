@@ -1,3 +1,5 @@
+use alloc::string::ToString;
+
 use zeroize::ZeroizeOnDrop;
 
 #[derive(Clone)]
@@ -47,10 +49,6 @@ impl PublicKey {
 }
 
 /// Reject the identity point (all-zero public key).
-/// Ed25519 defines the identity element as a valid point, but it is
-/// useless for signature verification — it would make any signature
-/// trivially verifiable.  Rejecting it at parse time prevents a class
-/// of attacks where an adversary crafts a statement with a zero key.
 pub fn validate_public_key(pk: &[u8; 32]) -> crate::error::Result<()> {
     if pk.iter().all(|&b| b == 0) {
         return Err(crate::error::Error::Crypto(
@@ -73,14 +71,7 @@ impl Signature {
     }
 }
 
-pub fn generate_keypair() -> Keypair {
-    let mut seed = [0u8; 32];
-    use rand::RngCore;
-    use rand::rngs::OsRng;
-    OsRng.fill_bytes(&mut seed);
-    generate_keypair_from_seed(&seed)
-}
-
+/// Generate a key pair from a seed. Available in all configurations.
 pub fn generate_keypair_from_seed(seed: &[u8; 32]) -> Keypair {
     let dalek_pair = ed25519_dalek::SigningKey::from_bytes(seed);
     let public = dalek_pair.verifying_key();
@@ -88,6 +79,15 @@ pub fn generate_keypair_from_seed(seed: &[u8; 32]) -> Keypair {
         secret: SecretKey(*seed),
         public: PublicKey(public.to_bytes()),
     }
+}
+
+/// Generate a key pair with OS entropy. Not available on WASM
+/// (use JS crypto.getRandomValues + generate_keypair_from_seed instead).
+#[cfg(not(target_arch = "wasm32"))]
+pub fn generate_keypair() -> Keypair {
+    let mut seed = [0u8; 32];
+    getrandom::getrandom(&mut seed).expect("OS entropy unavailable");
+    generate_keypair_from_seed(&seed)
 }
 
 pub fn sign(secret: &SecretKey, message: &[u8]) -> Signature {
