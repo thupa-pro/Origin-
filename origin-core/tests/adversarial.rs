@@ -279,5 +279,3 @@ fn test_verify_trusted_key_roundtrip() {
     let enc = origin_core::encode_statement(&stmt);
     assert!(verify(&enc, b"trusted test", &trusted).is_ok());
 }
-
-
