@@ -16,7 +16,7 @@ base64 = { version = "0.22", features = ["alloc"] }
 zeroize = { version = "1", features = ["zeroize_derive"] }
 thiserror = "2"
 hex = "0.4"
-rand = "0.9"
+rand = "0.10"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
