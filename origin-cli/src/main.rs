@@ -115,6 +115,9 @@ enum Commands {
 
 fn load_secret_key(key_arg: &Option<String>) -> Result<SecretKey, String> {
     if let Ok(env_key) = std::env::var("ORIGIN_KEY") {
+        if key_arg.is_some() {
+            eprintln!("warning: ORIGIN_KEY env var takes priority over --key flag");
+        }
         let trimmed = env_key.trim().to_string();
         return decode_secret_key(&trimmed);
     }

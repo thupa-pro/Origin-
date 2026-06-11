@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Origin WASM Demo</title>
+  <style>
+    body { font-family: monospace; max-width: 720px; margin: 2em auto; padding: 0 1em; }
+    textarea, pre { width: 100%; box-sizing: border-box; }
+    textarea { font-family: monospace; }
+    .ok { color: #090; }
+    .fail { color: #c00; }
+  </style>
+</head>
+<body>
+  <h1>Origin — WASM Demo</h1>
+  <p>Cryptographic provenance in the browser.</p>
+
+  <h2>1. Hash</h2>
+  <p>SHA-256 of the input below:</p>
+  <input id="hash-input" type="text" value="hello world" style="width:100%;font:inherit">
+  <pre id="hash-output" class="ok"></pre>
+
+  <h2>2. Verify</h2>
+  <p>Paste a .origin statement and artifact text, then click Verify:</p>
+  <textarea id="stmt-input" rows="7">origin: v1
+type: provenance
+hash: sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
+time: 0
+key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+sig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==</textarea>
+  <input id="art-input" type="text" value="hello world" style="width:100%;font:inherit">
+  <button id="verify-btn">Verify</button>
+  <pre id="verify-output"></pre>
+
+  <h2>3. Audit</h2>
+  <p>Parse and display a statement:</p>
+  <pre id="audit-output"></pre>
+
+  <script type="module">
+    import init, { hash_hex, verify_consistency, parse_audit } from './pkg/origin_wasm_example.js';
+
+    async function run() {
+      await init();
+
+      // Hash
+      const hashInput = document.getElementById('hash-input');
+      const hashOutput = document.getElementById('hash-output');
+      function updateHash() {
+        const data = new TextEncoder().encode(hashInput.value);
+        hashOutput.textContent = 'sha256:' + hash_hex(data);
+      }
+      hashInput.addEventListener('input', updateHash);
+      updateHash();
+
+      // Verify
+      document.getElementById('verify-btn').addEventListener('click', () => {
+        const stmt = new TextEncoder().encode(document.getElementById('stmt-input').value + '\n');
+        const art = new TextEncoder().encode(document.getElementById('art-input').value);
+        const output = document.getElementById('verify-output');
+        const result = verify_consistency(stmt, art);
+        output.className = result.startsWith('VERIFIED') ? 'ok' : 'fail';
+        output.textContent = result;
+      });
+
+      // Audit (auto-run on the default statement)
+      const stmt = new TextEncoder().encode(document.getElementById('stmt-input').value + '\n');
+      document.getElementById('audit-output').textContent = parse_audit(stmt);
+    }
+
+    run();
+  </script>
+</body>
+</html>

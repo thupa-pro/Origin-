@@ -1,13 +1,10 @@
-FROM rust:1.85-slim-bookworm AS builder
-
+FROM rust:alpine AS builder
+RUN apk add --no-cache musl-dev
 WORKDIR /app
 COPY . .
+RUN cargo build --release --bin origin
 
-RUN cargo build --release
-
-FROM gcr.io/distroless/cc-debian12
-COPY --from=builder /app/target/release/origin /usr/local/bin/origin
-USER nobody
-
-ENTRYPOINT ["origin"]
+FROM gcr.io/distroless/cc
+COPY --from=builder /app/target/release/origin /bin/origin
+ENTRYPOINT ["/bin/origin"]
 CMD ["--help"]

@@ -2,7 +2,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build test check clean coverage docs man install-man fuzz bench sbom tag-release dist release
+.PHONY: help build test check clean coverage docs man install-man fuzz bench sbom tag-release dist release docker docker-push wasm
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -57,6 +57,17 @@ dist: ## Build tarball of the release binary
 clean: ## Clean build artifacts
 	cargo clean
 	rm -rf dist
+
+docker: ## Build distroless Docker image
+	docker build -t origin:$(shell cargo metadata --no-deps --format-version 1 | sed 's/.*"version":"\([^"]*\)".*/\1/') .
+
+docker-push: docker ## Push Docker image to GHCR
+	docker tag origin:$(shell cargo metadata --no-deps --format-version 1 | sed 's/.*"version":"\([^"]*\)".*/\1/') ghcr.io/thupa-pro/origin:$(shell cargo metadata --no-deps --format-version 1 | sed 's/.*"version":"\([^"]*\)".*/\1/')
+	docker tag origin:$(shell cargo metadata --no-deps --format-version 1 | sed 's/.*"version":"\([^"]*\)".*/\1/') ghcr.io/thupa-pro/origin:latest
+	docker push ghcr.io/thupa-pro/origin --all-tags
+
+wasm: ## Build WASM example
+	cargo build -p origin-wasm-example --target wasm32-unknown-unknown
 
 release: ## Publish to crates.io (requires CARGO_REGISTRY_TOKEN)
 	cargo publish -p origin-core
