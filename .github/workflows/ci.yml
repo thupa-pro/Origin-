@@ -37,3 +37,25 @@ jobs:
       - run: node --test sdk/typescript/test.mjs
       - run: cbindgen --config origin-core/cbindgen.toml --crate origin-core --output sdk/c/origin_core.h
       - run: test -s sdk/c/origin_core.h
+      - run: cargo bench --no-run
+
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rust-src
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-fuzz-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo install cargo-fuzz --locked
+      - run: cargo +nightly fuzz build
+      - run: cargo +nightly fuzz run fuzz_parse -- -runs=50000
+      - run: cargo +nightly fuzz run fuzz_binary -- -runs=50000
+      - run: cargo +nightly fuzz run fuzz_base64 -- -runs=50000

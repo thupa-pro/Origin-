@@ -24,5 +24,12 @@ hashbrown = { version = "0.15", default-features = false, features = ["default-h
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 getrandom = { version = "0.2", default-features = false }
 
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false }
+
+[[bench]]
+name = "verify"
+harness = false
+
 [lints.rust]
 unsafe_code = "deny"

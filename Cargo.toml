@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["origin-core", "origin-cli"]
+members = ["origin-core", "origin-cli", "fuzz"]
 
 [workspace.package]
 version = "1.0.0"
