@@ -102,6 +102,31 @@ jobs:
           /tmp/origin-target/origin-x86_64-unknown-linux-gnu
           /tmp/origin-target/origin-x86_64-unknown-linux-gnu.origin
 
+  build-windows:
+    runs-on: windows-latest
+    needs: create-release
+    permissions:
+      contents: write
+    env:
+      TARGET: x86_64-pc-windows-msvc
+      CARGO_TARGET_DIR: D:\a\origin-target
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        target: x86_64-pc-windows-msvc
+    - run: cargo build --release --target x86_64-pc-windows-msvc
+      env:
+        CARGO_TARGET_DIR: D:\a\origin-target
+    - name: Prepare unique binary name
+      run: |
+        copy D:\a\origin-target\x86_64-pc-windows-msvc\release\origin.exe D:\a\origin-target\origin-x86_64-pc-windows-msvc.exe
+      shell: cmd
+    - name: Upload binary
+      uses: softprops/action-gh-release@v3
+      with:
+        files: D:\a\origin-target\origin-x86_64-pc-windows-msvc.exe
+
   build-macos:
     runs-on: macos-latest
     needs: create-release

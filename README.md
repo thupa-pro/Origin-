@@ -37,8 +37,11 @@ Origin answers one question with a single command: **"Did key X sign artifact Y?
 cargo install origin-cli
 
 # Linux binary (x86-64)
-curl -sL https://github.com/thupa-pro/Origin/releases/latest/download/origin-linux-x86_64.gz | gunzip > origin
+curl -sL https://github.com/thupa-pro/Origin/releases/latest/download/origin-x86_64-unknown-linux-gnu > origin
 chmod +x origin && sudo mv origin /usr/local/bin/
+
+# Windows binary (x86-64, PowerShell)
+# curl -LO https://github.com/thupa-pro/Origin/releases/latest/download/origin-x86_64-pc-windows-msvc.exe
 
 # Homebrew (macOS / Linux)
 brew install --formula https://raw.githubusercontent.com/thupa-pro/Origin/main/Formula/origin.rb
