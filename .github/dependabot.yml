@@ -4,26 +4,22 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-      day: monday
     open-pull-requests-limit: 10
     labels:
       - dependencies
-      - automated
     commit-message:
-      prefix: "deps"
-      prefix-development: "deps(dev)"
-    groups:
-      rust-dependencies:
-        patterns:
-          - "*"
+      prefix: "chore"
+      prefix-development: "chore"
+    ignore:
+      - dependency-name: "wasm-bindgen"
+        update-types: ["version-update:semver-major"]
 
-  - package-ecosystem: github-actions
+  - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: monthly
+      interval: weekly
     open-pull-requests-limit: 5
     labels:
       - ci
-      - automated
     commit-message:
       prefix: "ci"

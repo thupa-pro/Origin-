@@ -8,6 +8,7 @@ const MAX_TIMESTAMP: u64 = 253402300799;
 const KEY_B64_LEN: usize = 44;
 const SIG_B64_LEN: usize = 88;
 const HEX_CHARS: &[u8] = b"0123456789abcdef";
+const MAX_LINE_LENGTH: usize = 256;
 
 /// A parsed provenance statement.
 ///
@@ -43,30 +44,7 @@ pub struct Statement {
 }
 
 fn validate_hash_prefix(s: &str) -> Result<()> {
-    let colon_pos = s
-        .find(':')
-        .ok_or_else(|| Error::Format("hash missing algorithm prefix (e.g., 'sha256:')".into()))?;
-    let alg_str = &s[..colon_pos];
-    let hex_val = &s[colon_pos + 1..];
-
-    if alg_str != "sha256" {
-        return Err(Error::Format(format!("unknown hash algorithm '{}'. Allowed: sha256", alg_str)));
-    }
-
-    let expected_hex_len = 64;
-    if hex_val.len() != expected_hex_len {
-        return Err(Error::Format(format!(
-            "sha256 hex length {} (expected {})",
-            hex_val.len(),
-            expected_hex_len
-        )));
-    }
-
-    if !hex_val.as_bytes().iter().all(|b| HEX_CHARS.contains(b)) {
-        return Err(Error::Format("non-hex character or uppercase in hash".into()));
-    }
-
-    Ok(())
+    parse_hash_string(s).map(|_| ())
 }
 
 fn parse_hash_string(s: &str) -> Result<(String, Vec<u8>)> {
@@ -165,6 +143,14 @@ impl Statement {
         for (i, line) in lines.iter().enumerate() {
             if line.is_empty() {
                 return Err(Error::Format(format!("line {} is empty", i + 1)));
+            }
+            if line.len() > MAX_LINE_LENGTH {
+                return Err(Error::Format(format!(
+                    "line {} exceeds maximum length ({} > {})",
+                    i + 1,
+                    line.len(),
+                    MAX_LINE_LENGTH
+                )));
             }
         }
 

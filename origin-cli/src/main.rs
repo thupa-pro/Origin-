@@ -146,7 +146,7 @@ fn decode_secret_key(s: &str) -> Result<SecretKey, String> {
 fn current_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
+        .expect("system clock is before UNIX epoch")
         .as_secs()
 }
 

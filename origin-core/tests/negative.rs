@@ -392,3 +392,13 @@ fn test_statement_parent_hash_hex_no_parent() {
     let s = Statement::parse(&valid_statement()).unwrap();
     assert_eq!(s.parent_hash_hex(), None);
 }
+
+#[test]
+fn test_line_too_long() {
+    let long = "A".repeat(300);
+    let data = format!(
+        "origin: v1\ntype: provenance\nhash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\ntime: 0\nkey: {}\nsig: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n",
+        long
+    );
+    assert_parse_fails(data.as_bytes(), "line exceeds maximum length");
+}

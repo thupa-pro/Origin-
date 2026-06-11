@@ -1,16 +1,13 @@
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::ZeroizeOnDrop;
 
 /// An Ed25519 keypair (secret + public).
+///
+/// The secret key is zeroized on drop via `SecretKey::ZeroizeOnDrop`.
+/// The public key does not need zeroizing.
 #[derive(Clone)]
 pub struct Keypair {
     pub secret: SecretKey,
     pub public: PublicKey,
-}
-
-impl Drop for Keypair {
-    fn drop(&mut self) {
-        self.secret.0.zeroize();
-    }
 }
 
 /// An Ed25519 secret key (32 bytes, the seed per RFC 8032).

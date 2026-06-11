@@ -4,3 +4,6 @@
 !docs/*.origin
 fuzz/Cargo.lock
 dist/
+origin-linux-*
+origin-darwin-*
+origin-windows-*
