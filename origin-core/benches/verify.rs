@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 fn bench_verify(c: &mut Criterion) {
     let secret = origin_core::SecretKey::from_bytes(&[42u8; 32]).unwrap();

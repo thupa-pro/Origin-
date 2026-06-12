@@ -2,9 +2,9 @@
 
 extern crate alloc;
 
+use crate::Statement;
 use crate::crypto::SecretKey;
 use crate::statement::{build_statement, encode_statement, verify_statement};
-use crate::Statement;
 
 /// Allocate a buffer of `size` bytes in WASM linear memory.
 /// Returns a pointer that the caller must free with `origin_free_buffer`.

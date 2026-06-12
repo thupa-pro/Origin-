@@ -59,9 +59,8 @@ const MAX_TIMESTAMP: u64 = 253402300799;
 impl ProofOfOrigin {
     /// Parse from a raw 256-byte slice. Zero-allocation.
     pub fn from_bytes(bytes: &[u8; 256]) -> Result<&Self> {
-        let poo: &Self = bytemuck::try_from_bytes(bytes).map_err(|_| {
-            Error::Format("invalid binary proof size (expected 256)".into())
-        })?;
+        let poo: &Self = bytemuck::try_from_bytes(bytes)
+            .map_err(|_| Error::Format("invalid binary proof size (expected 256)".into()))?;
 
         if poo.version != PROTOCOL_VERSION {
             return Err(Error::Format(format!(
@@ -78,9 +77,7 @@ impl ProofOfOrigin {
         }
 
         if poo.reserved2.iter().any(|&b| b != 0) {
-            return Err(Error::Format(
-                "reserved2 field must be zero-filled".into(),
-            ));
+            return Err(Error::Format("reserved2 field must be zero-filled".into()));
         }
 
         let ts = u64::from_be_bytes(poo.timestamp);
@@ -164,8 +161,8 @@ impl ProofOfOrigin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::statement::build_statement;
     use crate::SecretKey;
+    use crate::statement::build_statement;
 
     #[test]
     fn test_binary_roundtrip() {

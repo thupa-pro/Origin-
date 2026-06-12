@@ -30,8 +30,8 @@ pub use binary::ProofOfOrigin;
 pub use crypto::generate_keypair;
 /// Re-export cryptographic key and signature types.
 pub use crypto::{
-    constant_time_eq, generate_keypair_from_seed, validate_public_key, Keypair, PublicKey,
-    SecretKey, Signature,
+    Keypair, PublicKey, SecretKey, Signature, constant_time_eq, generate_keypair_from_seed,
+    validate_public_key,
 };
 /// Re-export [`Error`] and [`Result`] from the `error` module.
 pub use error::{Error, Result};
@@ -40,8 +40,8 @@ pub use hash::hash_bytes;
 /// Re-export statement types and functions.
 pub use hash::hash_reader;
 pub use statement::{
-    build_statement, build_statement_from_hash, encode_statement, verify_statement,
-    verify_statement_hash, Statement,
+    Statement, build_statement, build_statement_from_hash, encode_statement, verify_statement,
+    verify_statement_hash,
 };
 
 /// A specialized [`Result`] type for verification operations.

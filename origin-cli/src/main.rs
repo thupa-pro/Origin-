@@ -107,14 +107,14 @@ fn atomic_write(path: &std::path::Path, contents: &[u8]) -> miette::Result<()> {
         .map_err(|e| miette::miette!("failed to create temp file in '{}': {}", dir.display(), e))?;
     std::io::Write::write_all(&mut tmp, contents)
         .map_err(|e| miette::miette!("failed to write temp file: {}", e))?;
-    tmp.persist(path)
-        .map_err(|e| miette::miette!("failed to rename temp file to '{}': {}", path.display(), e))?;
+    tmp.persist(path).map_err(|e| {
+        miette::miette!("failed to rename temp file to '{}': {}", path.display(), e)
+    })?;
     Ok(())
 }
 
 fn read_small_file(path: &std::path::Path) -> miette::Result<Vec<u8>> {
-    std::fs::read(path)
-        .map_err(|e| miette::miette!("failed to read '{}': {}", path.display(), e))
+    std::fs::read(path).map_err(|e| miette::miette!("failed to read '{}': {}", path.display(), e))
 }
 
 /// Stream-hash an artifact file, returning the raw hash bytes and hex string.
@@ -206,8 +206,8 @@ fn run(cli: Cli) -> miette::Result<Verdict> {
             let hash_hex_str = hex::encode(hash);
             let ts = timestamp_now();
 
-            let stmt = build_statement_from_hash(&secret, &hash_hex_str, &hash, ts)
-                .map_err(to_err)?;
+            let stmt =
+                build_statement_from_hash(&secret, &hash_hex_str, &hash, ts).map_err(to_err)?;
 
             let out_path = output.unwrap_or_else(|| {
                 let name = identity

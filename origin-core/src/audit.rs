@@ -35,7 +35,10 @@ fn timestamp_to_iso8601(ts: u64) -> String {
     let mi = (day_secs % 3600) / 60;
     let s = day_secs % 60;
 
-    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", year, month, d, h, mi, s)
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        year, month, d, h, mi, s
+    )
 }
 
 /// Format a [`Statement`] into a human-readable audit string.

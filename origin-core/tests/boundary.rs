@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use origin_core::crypto::SecretKey;
-use origin_core::statement::{build_statement, encode_statement, verify_statement, Statement};
+use origin_core::statement::{Statement, build_statement, encode_statement, verify_statement};
 use origin_core::verify_bytes;
 
 // ─── Zero-byte artifact ──────────────────────────────────────────
@@ -39,7 +39,10 @@ fn test_large_artifact_10mb() {
 #[test]
 fn test_binary_artifact_png() {
     let png_header: Vec<u8> = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-    let artifact: Vec<u8> = png_header.into_iter().chain(std::iter::repeat_n(0xFF, 1024)).collect();
+    let artifact: Vec<u8> = png_header
+        .into_iter()
+        .chain(std::iter::repeat_n(0xFF, 1024))
+        .collect();
     let secret = SecretKey::from_bytes(&[13u8; 32]).unwrap();
     let stmt = build_statement(&secret, &artifact, 300).unwrap();
     assert!(verify_statement(&stmt, &artifact).is_ok());
@@ -50,7 +53,10 @@ fn test_binary_artifact_png() {
 #[test]
 fn test_binary_artifact_wasm() {
     let wasm_magic: Vec<u8> = vec![0x00, 0x61, 0x73, 0x6D]; // \0asm
-    let artifact: Vec<u8> = wasm_magic.into_iter().chain(std::iter::repeat_n(0x00, 4096)).collect();
+    let artifact: Vec<u8> = wasm_magic
+        .into_iter()
+        .chain(std::iter::repeat_n(0x00, 4096))
+        .collect();
     let secret = SecretKey::from_bytes(&[14u8; 32]).unwrap();
     let stmt = build_statement(&secret, &artifact, 400).unwrap();
     assert!(verify_statement(&stmt, &artifact).is_ok());
@@ -131,11 +137,15 @@ fn test_concurrent_verify() {
 #[test]
 fn test_malformed_utf8_statement() {
     // Invalid UTF-8 continuation byte
-    let bad = vec![0x6F, 0x72, 0x69, 0x67, 0x69, 0x6E, 0x3A, 0x20, 0x76, 0x31, 0x0A, 0x80];
+    let bad = vec![
+        0x6F, 0x72, 0x69, 0x67, 0x69, 0x6E, 0x3A, 0x20, 0x76, 0x31, 0x0A, 0x80,
+    ];
     assert!(Statement::parse(&bad).is_err());
 
     // Truncated multi-byte character
-    let bad2 = vec![0x6F, 0x72, 0x69, 0x67, 0x69, 0x6E, 0x3A, 0x20, 0x76, 0x31, 0xC3];
+    let bad2 = vec![
+        0x6F, 0x72, 0x69, 0x67, 0x69, 0x6E, 0x3A, 0x20, 0x76, 0x31, 0xC3,
+    ];
     assert!(Statement::parse(&bad2).is_err());
 }
 

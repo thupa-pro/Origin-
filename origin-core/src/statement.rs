@@ -92,7 +92,8 @@ impl Statement {
     /// Validates the structure, encoding, and cryptographic key material
     /// without verifying the signature (use [`verify_statement`] for that).
     pub fn parse(data: &[u8]) -> Result<Self> {
-        let text = core::str::from_utf8(data).map_err(|_| Error::Format("not valid UTF-8".into()))?;
+        let text =
+            core::str::from_utf8(data).map_err(|_| Error::Format("not valid UTF-8".into()))?;
 
         if data.starts_with(b"\xef\xbb\xbf") {
             return Err(Error::Format("BOM not allowed".into()));
@@ -173,7 +174,8 @@ impl Statement {
                 if (cp < 0x20 && cp != 0x0a) || cp == 0x7f {
                     return Err(Error::Format(format!(
                         "line {}: control character U+{:04X} in value",
-                        i + 1, cp
+                        i + 1,
+                        cp
                     )));
                 }
             }
@@ -186,7 +188,9 @@ impl Statement {
             if *key != VALID_KEYS[i] {
                 return Err(Error::Format(format!(
                     "line {}: expected key '{}', got '{}'",
-                    i + 1, VALID_KEYS[i], key
+                    i + 1,
+                    VALID_KEYS[i],
+                    key
                 )));
             }
             if !seen_keys.insert(key) {
@@ -213,8 +217,8 @@ impl Statement {
         }
         let hash_hex = &hash_val[hash_prefix.len()..];
         validate_hex_lowercase(hash_hex, 64)?;
-        let hash_bytes =
-            hex::decode(hash_hex).map_err(|e| Error::Format(alloc::format!("invalid hex: {}", e)))?;
+        let hash_bytes = hex::decode(hash_hex)
+            .map_err(|e| Error::Format(alloc::format!("invalid hex: {}", e)))?;
         let mut hb = [0u8; 32];
         hb.copy_from_slice(&hash_bytes);
 
@@ -311,7 +315,13 @@ pub fn build_statement_from_hash(
     let time_line = alloc::format!("time: {}", timestamp);
     let key_line = alloc::format!("key: {}", public_b64);
 
-    let canonical = alloc::format!("{}\n{}\n{}\n{}", origin_line, hash_line, time_line, key_line);
+    let canonical = alloc::format!(
+        "{}\n{}\n{}\n{}",
+        origin_line,
+        hash_line,
+        time_line,
+        key_line
+    );
 
     let sig = crypto::sign(secret, canonical.as_bytes());
     let sig_b64 = crate::base64_encode(&sig.0);
@@ -341,7 +351,11 @@ pub fn build_statement_from_hash(
 pub fn encode_statement(stmt: &Statement) -> Vec<u8> {
     format!(
         "{}\n{}\n{}\n{}\n{}\n",
-        stmt.raw_lines[0], stmt.raw_lines[1], stmt.raw_lines[2], stmt.raw_lines[3], stmt.raw_lines[4],
+        stmt.raw_lines[0],
+        stmt.raw_lines[1],
+        stmt.raw_lines[2],
+        stmt.raw_lines[3],
+        stmt.raw_lines[4],
     )
     .into_bytes()
 }
