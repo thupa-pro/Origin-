@@ -78,8 +78,8 @@ sig: <base64url>            →   signature bytes
 
 The reserved fields (`reserved` and `reserved2`) are for future protocol extensions:
 
-- `reserved` (1 byte): Reserved for future use. Must be `0x00`.
-- `reserved2` (118 bytes): Future field additions. Must be zero in this version.
+- `reserved` (9 bytes): All bytes must be zero. The first 2 bytes encode a LE u16 flags word for future protocol flags.
+- `reserved2` (110 bytes): Future field additions. Must be zero in this version.
 
 Applications MUST reject non-zero reserved bytes to ensure forward compatibility.
 

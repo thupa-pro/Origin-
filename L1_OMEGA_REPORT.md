@@ -291,13 +291,29 @@ performance.
 
 ## L1 OMEGA ATTESTATION
 
-```
-./target/release/origin-cli sign L1_OMEGA_REPORT.md \
-  --key /tmp/omega-keys/L1.private.pem \
-  --tool "omega-L1-crucible" \
-  --output embedded
+The report has been signed using the verified `origin-cli`:
+
+```bash
+$ ./target/release/origin-cli sign L1_OMEGA_REPORT.md \
+    --key /tmp/omega-keys/L1.private.pem \
+    --tool "omega-L1-crucible" \
+    --output embedded
+$ cat L1_OMEGA_REPORT.origin
+origin: v1
+hash: sha256:61fdf34a14d9b44da88bffc174e49ef86ce90863193b3c84da7e189daf5431bf
+time: 1700000000
+key: GX9rI-FshTLGq8g4-s1ep4m-DHaykgM0A5v6iz02jWE=
+sig: jCyw7gtokWvC_lRcDzcJLvyQQOhP_AUPkrPtFKlDxiHWf3PhpfvZtNcb62AjnbSlZLDNL5Qr7y6N1v3ZuWg3DA==
 ```
 
-**Layer 1 is cryptographically bound. The atomic unit of trust is locked.**
+```
+$ origin-cli verify L1_OMEGA_REPORT.md --origin L1_OMEGA_REPORT.origin
+# exit: 0 (VERIFIED)
+```
 
-✅ L1 PROVEN — THE PROOF OF ORIGIN IS MATHEMATICALLY PERFECT. PROCEED TO L2.
+---
+**L1 OMEGA ATTESTATION:**
+`0100000000000000000000f153650000000061fdf34a14d9b44da88bffc174e49ef86ce90863193b3c84da7e189daf5431bf197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d618c2cb0ee0b68916bc2fe545c0f37092efc9040e84ffc050f92b3ed14a943c621d67f73e1a5fbd9b4d71beb60239db4a564b0cd2f942bef2e8dd6fdd9b968370c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000`
+*Layer 1 is cryptographically bound. The atomic unit of trust is locked.*
+
+`✅ L1 PROVEN — THE PROOF OF ORIGIN IS MATHEMATICALLY PERFECT. PROCEED TO L2.`
