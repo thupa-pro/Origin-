@@ -1,0 +1,19 @@
+=== Domain 1.1: Compile-Time Size & Offset Proof ===
+size_of::<ProofOfOrigin>() = 256
+align_of::<ProofOfOrigin>() = 1
+
+Field offsets:
+  version    @ offset_of! = 0
+  reserved   @ offset_of! = 1
+  timestamp  @ offset_of! = 10
+  hash       @ offset_of! = 18
+  pubkey     @ offset_of! = 50
+  signature  @ offset_of! = 82
+  reserved2  @ offset_of! = 146
+
+Field sizes:
+  reserved: [u8; 9] = 9 bytes
+  reserved2: [u8; 110] = 110 bytes
+
+✅ ALL ASSERTIONS PASS — 256-byte, alignment 1, no padding
+Uses #[repr(C, packed)] and bytemuck::Pod for zero-copy.

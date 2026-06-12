@@ -1,0 +1,9 @@
+[package]
+name = "origin-zk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Origin ZK — zero-knowledge circuits for Proof of Binding and Consent Proofs"
+
+[dependencies]
+origin-core = { path = "../origin-core" }

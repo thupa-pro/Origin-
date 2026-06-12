@@ -1,0 +1,10 @@
+[package]
+name = "origin-ikm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Origin IKM — Identity & Key Management: DID:origin method, key delegation, and reputation math"
+
+[dependencies]
+origin-core = { path = "../origin-core" }
+serde = { version = "1", features = ["derive"], optional = true }

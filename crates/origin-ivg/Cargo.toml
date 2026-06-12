@@ -1,0 +1,10 @@
+[package]
+name = "origin-ivg"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Origin IVG — Intent-Value Graph: CRDT-based rulebook storage and policy resolution"
+
+[dependencies]
+origin-core = { path = "../origin-core" }
+serde = { version = "1", features = ["derive"], optional = true }

@@ -1,0 +1,9 @@
+[package]
+name = "origin-embed"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Origin Embed — steganographic payload injection for EXIF, ID3, PDF, and image carriers"
+
+[dependencies]
+origin-core = { path = "../origin-core" }

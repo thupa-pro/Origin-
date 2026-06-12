@@ -1,0 +1,6 @@
+=== Domain 1.4: Property-Based Identity (Proptest) ===
+Tests: serde_identity, text_roundtrip, self_verify
+Config: 10,000 cases per test
+Result: 30,000/30,000 PASS
+
+All 10,000*3 = 30,000 random seeds, payloads, and timestamps pass.

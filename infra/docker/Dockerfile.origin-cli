@@ -1,0 +1,11 @@
+# Origin CLI — Distroless Multi-Stage Build
+FROM rust:1.81-slim-bookworm AS builder
+
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ ./crates/
+RUN cargo build --release -p origin-cli
+
+FROM gcr.io/distroless/cc-debian12:latest
+COPY --from=builder /app/target/release/origin-cli /usr/local/bin/origin-cli
+ENTRYPOINT ["origin-cli"]

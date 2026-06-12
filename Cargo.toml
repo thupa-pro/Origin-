@@ -1,6 +1,16 @@
 [workspace]
 resolver = "2"
-members = ["origin-core", "origin-cli", "fuzz"]
+members = [
+    "crates/origin-core",
+    "crates/origin-cli",
+    "crates/origin-embed",
+    "crates/origin-ivg",
+    "crates/origin-hae",
+    "crates/origin-vrm",
+    "crates/origin-ikm",
+    "crates/origin-zk",
+    "crates/fuzz",
+]
 
 [workspace.package]
 version = "1.0.0"

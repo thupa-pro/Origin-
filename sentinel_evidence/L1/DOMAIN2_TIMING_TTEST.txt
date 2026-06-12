@@ -1,0 +1,6 @@
+DOMAIN2_TIMING_TTEST
+Valid n=1000 mean=1268263.3ns var=20361451422.6
+Invalid n=1000 mean=1265756.8ns var=14587592864.0
+t=0.4240 df=1945
+Significant=false
+Verdict: ✅ NO TIMING LEAK DETECTED

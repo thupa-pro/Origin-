@@ -1,0 +1,10 @@
+language = "C"
+style = "type"
+include_guard = "ORIGIN_CORE_H"
+
+[defines]
+"target_arch = \"wasm32\"" = "wasm32"
+
+[export]
+include = ["origin_alloc", "origin_verify", "origin_sign", "origin_free_buffer"]
+item_types = ["functions"]

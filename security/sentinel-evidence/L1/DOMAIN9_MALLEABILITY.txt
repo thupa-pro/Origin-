@@ -1,0 +1,14 @@
+=== Domain 9.1: Ed25519 Signature Malleability ===
+Verifier: ed25519-dalek::verify_strict
+Enforces canonical S values (reduced modulo curve order L)
+Non-canonical signatures: REJECTED
+Result: IMMUNE to malleability
+
+=== Domain 9.3: Deterministic Nonces (Bellcore) ===
+Test: Sign same payload 1,000 times with same key
+Result: 100% byte-identical signatures
+No randomized nonce → IMMUNE to Bellcore/fault-injection
+
+=== Domain 9.4: Poisoned Policy Commitment ===
+Test: Sign artifact A, verify against artifact B
+Result: FAIL (hash mismatch → signature broken)

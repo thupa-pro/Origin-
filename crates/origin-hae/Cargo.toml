@@ -1,0 +1,10 @@
+[package]
+name = "origin-hae"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Origin HAE+ — Hybrid Attestation Engine: TEE quote parsing and ZK proof of binding"
+
+[dependencies]
+origin-core = { path = "../origin-core" }
+serde = { version = "1", features = ["derive"], optional = true }

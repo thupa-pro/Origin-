@@ -1,0 +1,10 @@
+[package]
+name = "origin-vrm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Origin VRM — Value Routing Mesh: state channel logic, fee markets, and micro-royalty settlement"
+
+[dependencies]
+origin-core = { path = "../origin-core" }
+serde = { version = "1", features = ["derive"], optional = true }

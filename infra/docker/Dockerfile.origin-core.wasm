@@ -1,0 +1,11 @@
+# WASM Build for origin-core
+FROM rust:1.81-slim-bookworm AS builder
+
+RUN rustup target add wasm32-unknown-unknown
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY crates/origin-core/ ./crates/origin-core/
+RUN cargo build --release -p origin-core --target wasm32-unknown-unknown
+
+FROM scratch
+COPY --from=builder /app/target/wasm32-unknown-unknown/release/origin_core.wasm /origin-core.wasm

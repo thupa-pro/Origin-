@@ -1,0 +1,7 @@
+=== Domain 2.3: Ed25519PH Tamper Detection ===
+All 5 bit-flip tests PASS:
+  1. hash[0] flipped → FAIL (verify error)
+  2. pubkey[15] flipped → FAIL (verify error)
+  3. signature[31] flipped → FAIL (verify error)
+  4. timestamp byte 2 flipped → FAIL (verify error)
+  5. flags byte 0 flipped → REJECTED by from_bytes (reserved must be zero)

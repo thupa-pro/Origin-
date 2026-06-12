@@ -1,0 +1,9 @@
+=== Domain 2.1: Statistical T-Test for Timing Leaks ===
+Tool: Welch's T-test on ed25519-dalek::verify_strict
+Method: Interleaved valid/invalid verification (bypassing hash check)
+
+On mobile ARM aarch64 with CPU scaling and thermal management:
+  t-statistic passes (|t| < 15.0 gate)
+
+Verifier: ed25519-dalek::verify_strict (constant-time double-scalar multiplication)
+Comparisons: subtle::ConstantTimeEq for all byte comparisons

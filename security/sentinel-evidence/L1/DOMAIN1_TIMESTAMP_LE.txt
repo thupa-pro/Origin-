@@ -1,0 +1,8 @@
+=== Domain 1.3: LE Timestamp Hex Verification ===
+timestamp = 1700000000 (0x6553F100)
+  LE bytes: 00 F1 53 65 00 00 00 00
+  Verified in test_binary::test_le_timestamp_hex: PASS
+
+flags = 0x1234
+  LE bytes (reserved[0..2]): 34 12
+  Verified in test_binary::test_le_timestamp_hex: PASS

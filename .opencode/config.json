@@ -1,0 +1,16 @@
+{
+  "name": "origin-network",
+  "description": "Gold-standard hourglass monorepo for cryptographic provenance",
+  "agnt": {
+    "rules": [
+      "origin-core must remain #![no_std]",
+      "No unwrap() in production code",
+      "No serde in origin-core",
+      "All cryptographic comparisons use subtle::ConstantTimeEq",
+      "Streaming I/O for large artifacts"
+    ]
+  },
+  "lint": {
+    "rust": ["cargo fmt --check", "cargo clippy --all-targets -- -D warnings", "cargo deny check"]
+  }
+}

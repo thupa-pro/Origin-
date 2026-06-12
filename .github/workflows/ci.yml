@@ -5,11 +5,17 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+  id-token: write          # SLSA provenance
+  attestations: write      # SLSA attestation upload
+
 env:
   CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
 
 jobs:
-  check:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,27 +23,44 @@ jobs:
         with:
           components: clippy, rustfmt
           targets: wasm32-unknown-unknown
-      - run: cargo install cbindgen --locked
       - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo deny check
+      - run: cargo clippy -p origin-core --target wasm32-unknown-unknown --all-targets -- -D warnings
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo install cbindgen --locked
       - run: cargo build
+      - run: cargo build -p origin-core --target wasm32-unknown-unknown
       - run: cargo test
       - run: cargo test --all-features
-      - run: cargo build -p origin-core --target wasm32-unknown-unknown
-      - run: cargo clippy --target wasm32-unknown-unknown --all-targets -- -D warnings
-      - run: mkdir -p sdk/typescript/bin && cp target/wasm32-unknown-unknown/debug/origin_core.wasm sdk/typescript/bin/origin-core.wasm
-      - run: node --test sdk/typescript/test.mjs
-      - run: cbindgen --config origin-core/cbindgen.toml --crate origin-core --output sdk/c/origin_core.h
-      - run: test -s sdk/c/origin_core.h
       - run: cargo bench --no-run
+      - run: mkdir -p packages/origin-sdk/bin
+      - run: cp target/wasm32-unknown-unknown/debug/origin_core.wasm packages/origin-sdk/bin/origin-core.wasm
+      - run: node --test packages/origin-sdk/test.mjs
+      - run: cbindgen --config crates/origin-core/cbindgen.toml --crate origin-core --output packages/origin-sdk/c/origin_core.h
+      - run: test -s packages/origin-sdk/c/origin_core.h
 
   fuzz:
     runs-on: ubuntu-latest
@@ -55,7 +78,43 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-fuzz-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo install cargo-fuzz --locked
-      - run: cargo +nightly fuzz build
-      - run: cargo +nightly fuzz run fuzz_parse -- -runs=50000
-      - run: cargo +nightly fuzz run fuzz_binary -- -runs=50000
-      - run: cargo +nightly fuzz run fuzz_base64 -- -runs=50000
+      - run: cargo +nightly fuzz build --fuzz-dir crates/fuzz
+      - run: cargo +nightly fuzz run --fuzz-dir crates/fuzz fuzz_parse -- -runs=50000
+      - run: cargo +nightly fuzz run --fuzz-dir crates/fuzz fuzz_binary -- -runs=50000
+      - run: cargo +nightly fuzz run --fuzz-dir crates/fuzz fuzz_base64 -- -runs=50000
+
+  scorecard:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ossf/scorecard-action@v2.4.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scorecard-results
+          path: results.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+
+  provenance:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint, build]
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - run: cargo build --release
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: target/release/origin-cli

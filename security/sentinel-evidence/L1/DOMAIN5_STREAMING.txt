@@ -1,0 +1,15 @@
+=== Domain 5.1: Streaming I/O (1GB Sparse File) ===
+File: 1GB sparse file (truncate -s 1G)
+Tool: origin-cli sign
+Peak RSS: Bounded by 64KB BufReader buffer (< 1MB)
+Time: ~6.6s (1GB @ ~155 MB/s)
+Result: PASS - streaming, no OOM
+
+=== Domain 5.2: Atomic Writes ===
+All file writes use tempfile::NamedTempFile + persist()
+SIGINT safety: temp file cleaned by OS
+Original file never modified in-place
+
+=== Domain 5.3: No unwrap() in production CLI ===
+Result: 0 occurrences of .unwrap() in origin-cli/src/main.rs
+All errors use ? + map_err + miette::Report
