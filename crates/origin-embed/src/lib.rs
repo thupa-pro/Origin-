@@ -90,9 +90,15 @@ impl MediaFormat {
 ///
 /// `payload` is the raw 256-byte `ProofOfOrigin` bytes.
 /// Returns a new `Vec<u8>` containing the artifact with the payload embedded.
-pub fn embed(payload: &[u8], artifact: &[u8], config: &EmbeddingConfig) -> Result<Vec<u8>, EmbedError> {
+pub fn embed(
+    payload: &[u8],
+    artifact: &[u8],
+    config: &EmbeddingConfig,
+) -> Result<Vec<u8>, EmbedError> {
     if payload.len() != 256 {
-        return Err(EmbedError::MalformedInput("payload must be exactly 256 bytes"));
+        return Err(EmbedError::MalformedInput(
+            "payload must be exactly 256 bytes",
+        ));
     }
     match config.format {
         MediaFormat::Jpeg => jpeg::embed(payload, artifact, config.overwrite),

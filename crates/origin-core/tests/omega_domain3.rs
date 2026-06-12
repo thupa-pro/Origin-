@@ -58,7 +58,12 @@ fn test_phash_1000_runs_deterministic() {
     let first = origin_core::hash::phash_64(&pixels);
     for i in 1..1000 {
         let h = origin_core::hash::phash_64(&pixels);
-        assert_eq!(h, first, "pHash must be deterministic: run {}/1000 differs", i + 1);
+        assert_eq!(
+            h,
+            first,
+            "pHash must be deterministic: run {}/1000 differs",
+            i + 1
+        );
     }
 }
 
@@ -125,7 +130,8 @@ fn test_jpeg_q50_hamming_distance() {
     {
         let file = std::fs::File::create(&jpg_path).expect("failed to create JPEG file");
         let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(file, 50);
-        img.write_with_encoder(encoder).expect("failed to write JPEG q=50");
+        img.write_with_encoder(encoder)
+            .expect("failed to write JPEG q=50");
     }
 
     let png_pixels = load_resize_grayscale(&png_path);
@@ -163,7 +169,8 @@ fn test_jpeg_q25_hamming_distance() {
     {
         let file = std::fs::File::create(&jpg_path).expect("failed to create JPEG file");
         let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(file, 25);
-        img.write_with_encoder(encoder).expect("failed to write JPEG q=25");
+        img.write_with_encoder(encoder)
+            .expect("failed to write JPEG q=25");
     }
 
     let png_pixels = load_resize_grayscale(&png_path);
@@ -237,7 +244,12 @@ fn test_simhash_200_runs_deterministic() {
     let first = origin_core::hash::simhash_256(&features);
     for i in 1..200 {
         let h = origin_core::hash::simhash_256(&features);
-        assert_eq!(h, first, "SimHash must be deterministic: run {}/200 differs", i + 1);
+        assert_eq!(
+            h,
+            first,
+            "SimHash must be deterministic: run {}/200 differs",
+            i + 1
+        );
     }
 }
 
@@ -254,7 +266,11 @@ fn test_simhash_similar_features_low_distance() {
     let hash_b = origin_core::hash::simhash_256(&features_b);
 
     // SimHash is a semantic hash: similar features should produce similar hashes
-    let diff: u32 = hash_a.iter().zip(hash_b.iter()).map(|(a, b)| (a ^ b).count_ones()).sum();
+    let diff: u32 = hash_a
+        .iter()
+        .zip(hash_b.iter())
+        .map(|(a, b)| (a ^ b).count_ones())
+        .sum();
     assert!(
         diff < 64,
         "Similar feature vectors should have < 64 bit differences, got {}",

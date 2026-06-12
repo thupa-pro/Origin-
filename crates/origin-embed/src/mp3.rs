@@ -19,10 +19,7 @@ const DESCRIPTION: &[u8] = b"origin";
 
 /// Decode a syncsafe integer (4 bytes, 7 bits per byte, big-endian).
 fn decode_syncsafe(buf: &[u8; 4]) -> u32 {
-    ((buf[0] as u32) << 21)
-        | ((buf[1] as u32) << 14)
-        | ((buf[2] as u32) << 7)
-        | (buf[3] as u32)
+    ((buf[0] as u32) << 21) | ((buf[1] as u32) << 14) | ((buf[2] as u32) << 7) | (buf[3] as u32)
 }
 
 /// Encode a syncsafe integer (4 bytes, 7 bits per byte, big-endian).
@@ -66,7 +63,9 @@ fn build_txxx_frame(payload: &[u8]) -> Vec<u8> {
 /// Embed payload into an MP3 file via ID3v2 TXXX frame.
 pub fn embed(payload: &[u8], artifact: &[u8], overwrite: bool) -> Result<Vec<u8>, EmbedError> {
     if artifact.len() < 10 || &artifact[0..3] != ID3_HEADER {
-        return Err(EmbedError::MalformedInput("not a valid MP3 (no ID3v2 header)"));
+        return Err(EmbedError::MalformedInput(
+            "not a valid MP3 (no ID3v2 header)",
+        ));
     }
 
     let header_size: u32 = {
@@ -192,10 +191,8 @@ fn find_txxx_origin(tag: &[u8]) -> Option<(usize, usize)> {
             let data_start = i + 11;
             let data_end = i + total_frame;
             if data_start < data_end
-                && let Some(null_pos) = tag[data_start..data_end]
-                    .iter()
-                    .position(|&b| b == 0x00)
-                    && &tag[data_start..data_start + null_pos] == DESCRIPTION
+                && let Some(null_pos) = tag[data_start..data_end].iter().position(|&b| b == 0x00)
+                && &tag[data_start..data_start + null_pos] == DESCRIPTION
             {
                 return Some((i, total_frame));
             }

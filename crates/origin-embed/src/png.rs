@@ -27,11 +27,11 @@ fn build_itxt_chunk(payload: &[u8]) -> Vec<u8> {
     let mut data = Vec::with_capacity(data_len);
 
     data.extend_from_slice(ITXT_KEYWORD);
-    data.push(0x00);          // null terminator for keyword
-    data.push(0x00);          // compression flag: uncompressed
-    data.push(0x00);          // compression method
-    data.push(0x00);          // null language tag
-    data.push(0x00);          // null translated keyword
+    data.push(0x00); // null terminator for keyword
+    data.push(0x00); // compression flag: uncompressed
+    data.push(0x00); // compression method
+    data.push(0x00); // null language tag
+    data.push(0x00); // null translated keyword
     data.extend_from_slice(base64_text.as_bytes());
 
     // Build full chunk: length (4) + type (4) + data + CRC (4)
@@ -67,7 +67,8 @@ fn crc32(data: &[u8]) -> u32 {
 fn find_iend(bytes: &[u8]) -> Option<(usize, &[u8])> {
     let mut i = 8; // skip signature
     while i + 12 <= bytes.len() {
-        let chunk_len = u32::from_be_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]) as usize;
+        let chunk_len =
+            u32::from_be_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]) as usize;
         let chunk_type = &bytes[i + 4..i + 8];
         let total = 4 + 4 + chunk_len + 4;
         if i + total > bytes.len() {
@@ -85,7 +86,8 @@ fn find_iend(bytes: &[u8]) -> Option<(usize, &[u8])> {
 fn find_itxt_origin(bytes: &[u8]) -> Option<(usize, usize)> {
     let mut i = 8;
     while i + 12 <= bytes.len() {
-        let chunk_len = u32::from_be_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]) as usize;
+        let chunk_len =
+            u32::from_be_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]) as usize;
         let chunk_type = &bytes[i + 4..i + 8];
         let total = 4 + 4 + chunk_len + 4;
         if i + total > bytes.len() {
@@ -107,10 +109,13 @@ fn find_itxt_origin(bytes: &[u8]) -> Option<(usize, usize)> {
 /// Embed payload into a PNG file via iTXt chunk.
 pub fn embed(payload: &[u8], artifact: &[u8], overwrite: bool) -> Result<Vec<u8>, EmbedError> {
     if artifact.len() < 8 || artifact[0..8] != PNG_SIG {
-        return Err(EmbedError::MalformedInput("not a valid PNG (bad signature)"));
+        return Err(EmbedError::MalformedInput(
+            "not a valid PNG (bad signature)",
+        ));
     }
 
-    let (iend_pos, iend_chunk) = find_iend(artifact).ok_or(EmbedError::MalformedInput("no IEND chunk found"))?;
+    let (iend_pos, iend_chunk) =
+        find_iend(artifact).ok_or(EmbedError::MalformedInput("no IEND chunk found"))?;
 
     // Check for existing origin iTXt
     if let Some((pos, len)) = find_itxt_origin(artifact) {

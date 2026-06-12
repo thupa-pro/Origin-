@@ -48,9 +48,7 @@ fn build_metadata_update(payload: &[u8], bytes: &[u8]) -> Result<Vec<u8>, EmbedE
     // Trailer
     let trailer = format!(
         "trailer\n<< /Size {} /Root {} 0 R >>\nstartxref\n{}\n%%%%EOF\n",
-        num_entries,
-        info_obj_num,
-        xref_offset
+        num_entries, info_obj_num, xref_offset
     );
 
     update_bytes.extend_from_slice(xref_str.as_bytes());
@@ -129,12 +127,12 @@ pub fn extract(artifact: &[u8]) -> Option<Vec<u8>> {
         if &artifact[i..i + 9] == origin_prefix {
             let start = i + 9;
             let end = artifact[start..].iter().position(|&b| b == b')');
-            let b64_str = end.and_then(|e| {
-                core::str::from_utf8(&artifact[start..start + e]).ok()
-            });
+            let b64_str = end.and_then(|e| core::str::from_utf8(&artifact[start..start + e]).ok());
             if let Some(s) = b64_str
-                && s.len() > 300 && s.len() < 400
-                && !s.contains('(') && !s.contains('\\')
+                && s.len() > 300
+                && s.len() < 400
+                && !s.contains('(')
+                && !s.contains('\\')
                 && let Ok(decoded) = origin_core::base64_decode(s)
             {
                 last_result = Some(decoded);

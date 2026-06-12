@@ -35,7 +35,9 @@ fn build_app15_marker(payload: &[u8]) -> [u8; APP15_MARKER_LEN] {
 /// Embed payload into a JPEG file via APP15 marker.
 pub fn embed(payload: &[u8], artifact: &[u8], overwrite: bool) -> Result<Vec<u8>, EmbedError> {
     if artifact.len() < 2 || artifact[0] != 0xFF || artifact[1] != 0xD8 {
-        return Err(EmbedError::MalformedInput("not a valid JPEG (no SOI marker)"));
+        return Err(EmbedError::MalformedInput(
+            "not a valid JPEG (no SOI marker)",
+        ));
     }
 
     let marker = build_app15_marker(payload);

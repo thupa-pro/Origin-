@@ -2,8 +2,8 @@
 // OMEGA CRUCIBLE — Domain 6: Structural Fuzzing & Zero-Alloc Proving
 
 use bytemuck::Zeroable;
-use origin_core::binary::ProofOfOrigin;
 use origin_core::SecretKey;
+use origin_core::binary::ProofOfOrigin;
 
 /// 6.3 STRUCTURAL FUZZING — 100,000 random 256-byte arrays tested
 /// against from_bytes(). Verifies zero panics (all random inputs are
@@ -18,11 +18,15 @@ fn test_100k_random_poo_arrays() {
     let mut state: u64 = 0xDEAD_BEEF_CAFE_BABE;
 
     for _ in 0..100_000 {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let mut bytes = [0u8; 256];
         for b in bytes.iter_mut() {
             *b = (state >> 40) as u8;
-            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
         }
 
         match ProofOfOrigin::from_bytes(&bytes) {
@@ -53,7 +57,10 @@ fn test_100k_random_poo_arrays() {
         "Expected 0 successes for truly random input; got {}",
         successes
     );
-    assert_eq!(failures, 100_000, "All 100K random arrays must be gracefully rejected");
+    assert_eq!(
+        failures, 100_000,
+        "All 100K random arrays must be gracefully rejected"
+    );
 }
 
 /// 6.3b — 1000 structurally valid statements through the full
@@ -72,7 +79,10 @@ fn test_1000_structurally_valid_statements() {
         let parsed = origin_core::Statement::parse(&encoded)
             .expect("parse must succeed for valid statement");
         let result = origin_core::verify_statement(&parsed, payload.as_bytes());
-        assert!(result.is_ok(), "verify must succeed for self-signed statement");
+        assert!(
+            result.is_ok(),
+            "verify must succeed for self-signed statement"
+        );
         successes += 1;
     }
 
@@ -157,8 +167,8 @@ fn test_1m_poo_serialization_zero_alloc() {
             poo.version = 0x01;
             // Set a valid pubkey
             poo.pubkey = [
-                208, 90, 152, 1, 130, 177, 10, 183, 213, 75, 254, 211, 201, 100, 7, 58,
-                14, 225, 114, 243, 218, 162, 38, 53, 175, 2, 26, 104, 247, 7, 81, 26,
+                208, 90, 152, 1, 130, 177, 10, 183, 213, 75, 254, 211, 201, 100, 7, 58, 14, 225,
+                114, 243, 218, 162, 38, 53, 175, 2, 26, 104, 247, 7, 81, 26,
             ];
             poo
         })
@@ -197,14 +207,38 @@ fn test_to_bytes_returns_fixed_array() {
     let mut input = [0u8; 256];
     input[0] = 0x01; // valid version
     // Set a valid pubkey (non-identity point)
-    input[50] = 208; input[51] = 90; input[52] = 152; input[53] = 1;
-    input[54] = 130; input[55] = 177; input[56] = 10; input[57] = 183;
-    input[58] = 213; input[59] = 75; input[60] = 254; input[61] = 211;
-    input[62] = 201; input[63] = 100; input[64] = 7; input[65] = 58;
-    input[66] = 14; input[67] = 225; input[68] = 114; input[69] = 243;
-    input[70] = 218; input[71] = 162; input[72] = 38; input[73] = 53;
-    input[74] = 175; input[75] = 2; input[76] = 26; input[77] = 104;
-    input[78] = 247; input[79] = 7; input[80] = 81; input[81] = 26;
+    input[50] = 208;
+    input[51] = 90;
+    input[52] = 152;
+    input[53] = 1;
+    input[54] = 130;
+    input[55] = 177;
+    input[56] = 10;
+    input[57] = 183;
+    input[58] = 213;
+    input[59] = 75;
+    input[60] = 254;
+    input[61] = 211;
+    input[62] = 201;
+    input[63] = 100;
+    input[64] = 7;
+    input[65] = 58;
+    input[66] = 14;
+    input[67] = 225;
+    input[68] = 114;
+    input[69] = 243;
+    input[70] = 218;
+    input[71] = 162;
+    input[72] = 38;
+    input[73] = 53;
+    input[74] = 175;
+    input[75] = 2;
+    input[76] = 26;
+    input[77] = 104;
+    input[78] = 247;
+    input[79] = 7;
+    input[80] = 81;
+    input[81] = 26;
     let poo_ref = ProofOfOrigin::from_bytes(&input).unwrap();
     let input_addr = &input as *const [u8; 256] as usize;
     let poo_addr = poo_ref as *const ProofOfOrigin as usize;
