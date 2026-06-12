@@ -17,22 +17,23 @@ pub use layout::ProofOfOrigin;
 mod layout {
     /// 256-byte fixed-width binary representation of a Proof of Origin.
     ///
-    /// Layout:
-    ///   [0]    version: u8           = 0x01
-    ///   [1]    reserved: u8          = 0x00
-    ///   [2..10]  timestamp: [u8; 8]  big-endian u64
-    ///   [10..42] hash: [u8; 32]      SHA-256
-    ///   [42..74] pubkey: [u8; 32]    Ed25519 public key
-    ///   [74..138] signature: [u8; 64] Ed25519
-    ///   [138..256] reserved2: [u8; 118] zeros
+    /// Layout (all multi-byte fields are Little-Endian):
+    ///   [0]      version: u8           = 0x01
+    ///   [1..10)  reserved: [u8; 9]     = zeros (bytes 0-1 = LE u16 flags)
+    ///   [10..18) timestamp: [u8; 8]    little-endian u64
+    ///   [18..50) hash: [u8; 32]        SHA-256
+    ///   [50..82) pubkey: [u8; 32]      Ed25519 public key
+    ///   [82..146] signature: [u8; 64]  Ed25519
+    ///   [146..256] reserved2: [u8; 110] zeros
     #[repr(C, packed)]
     #[derive(Copy, Clone)]
     pub struct ProofOfOrigin {
         /// Protocol version byte (must be `0x01`).
         pub version: u8,
-        /// Reserved byte (must be `0x00`).
-        pub reserved: u8,
-        /// Unix timestamp encoded as big-endian u64.
+        /// Reserved bytes, must be zero-filled.
+        /// First 2 bytes can be interpreted as a little-endian u16 flags word.
+        pub reserved: [u8; 9],
+        /// Unix timestamp encoded as little-endian u64.
         pub timestamp: [u8; 8],
         /// SHA-256 hash (32 bytes).
         pub hash: [u8; 32],
@@ -40,8 +41,8 @@ mod layout {
         pub pubkey: [u8; 32],
         /// Ed25519 signature (64 bytes).
         pub signature: [u8; 64],
-        /// Reserved padding, must be zero-filled (118 bytes).
-        pub reserved2: [u8; 118],
+        /// Reserved padding, must be zero-filled (110 bytes).
+        pub reserved2: [u8; 110],
     }
 
     const _SIZE: [(); 256] = [(); core::mem::size_of::<ProofOfOrigin>()];
@@ -69,18 +70,15 @@ impl ProofOfOrigin {
             )));
         }
 
-        if poo.reserved != 0 {
-            return Err(Error::Format(format!(
-                "reserved byte must be 0x00, got 0x{:02x}",
-                poo.reserved
-            )));
+        if poo.reserved.iter().any(|&b| b != 0) {
+            return Err(Error::Format("reserved field must be zero-filled".into()));
         }
 
         if poo.reserved2.iter().any(|&b| b != 0) {
             return Err(Error::Format("reserved2 field must be zero-filled".into()));
         }
 
-        let ts = u64::from_be_bytes(poo.timestamp);
+        let ts = u64::from_le_bytes(poo.timestamp);
         if ts > MAX_TIMESTAMP {
             return Err(Error::Format(format!(
                 "timestamp {} exceeds maximum {}",
@@ -93,21 +91,31 @@ impl ProofOfOrigin {
         Ok(poo)
     }
 
-    /// Decode the timestamp as a u64 (big-endian).
+    /// Decode the timestamp as a u64 (little-endian).
     pub fn timestamp_u64(&self) -> u64 {
-        u64::from_be_bytes(self.timestamp)
+        u64::from_le_bytes(self.timestamp)
+    }
+
+    /// Decode the flags word (first 2 bytes of reserved as LE u16).
+    pub fn flags(&self) -> u16 {
+        u16::from_le_bytes([self.reserved[0], self.reserved[1]])
+    }
+
+    /// Set the flags word (first 2 bytes of reserved).
+    pub fn set_flags(&mut self, flags: u16) {
+        let [lo, hi] = flags.to_le_bytes();
+        self.reserved[0] = lo;
+        self.reserved[1] = hi;
     }
 
     /// Build from a Statement (text format). Allocates the 256-byte array.
     pub fn from_statement(stmt: &Statement) -> Result<Self> {
         let mut poo = Self::zeroed();
         poo.version = PROTOCOL_VERSION;
-        poo.reserved = 0;
-        poo.timestamp = stmt.time.to_be_bytes();
+        poo.timestamp = stmt.time.to_le_bytes();
         poo.hash = stmt.hash_bytes;
         poo.pubkey = stmt.key_bytes;
         poo.signature = stmt.sig_bytes;
-        // reserved2 already zeroed
         Ok(poo)
     }
 
@@ -148,12 +156,12 @@ impl ProofOfOrigin {
     fn zeroed() -> Self {
         Self {
             version: 0,
-            reserved: 0,
+            reserved: [0u8; 9],
             timestamp: [0u8; 8],
             hash: [0u8; 32],
             pubkey: [0u8; 32],
             signature: [0u8; 64],
-            reserved2: [0u8; 118],
+            reserved2: [0u8; 110],
         }
     }
 }
@@ -196,7 +204,7 @@ mod tests {
     fn test_binary_rejects_nonzero_reserved() {
         let mut bytes = [0u8; 256];
         bytes[0] = PROTOCOL_VERSION;
-        bytes[1] = 0x01;
+        bytes[1] = 0x01; // first byte of 9-byte reserved
         assert!(ProofOfOrigin::from_bytes(&bytes).is_err());
     }
 
@@ -204,7 +212,8 @@ mod tests {
     fn test_binary_rejects_bad_timestamp() {
         let mut bytes = [0u8; 256];
         bytes[0] = PROTOCOL_VERSION;
-        bytes[2..10].copy_from_slice(&u64::MAX.to_be_bytes());
+        // timestamp at offset [10..18], LE bytes max u64
+        bytes[10..18].copy_from_slice(&u64::MAX.to_le_bytes());
         assert!(ProofOfOrigin::from_bytes(&bytes).is_err());
     }
 
@@ -212,7 +221,7 @@ mod tests {
     fn test_binary_rejects_zero_pubkey() {
         let mut bytes = [0u8; 256];
         bytes[0] = PROTOCOL_VERSION;
-        // pubkey at offset 42 is already zeros → identity point
+        // pubkey at offset [50..82] is already zeros → identity point
         assert!(ProofOfOrigin::from_bytes(&bytes).is_err());
     }
 
@@ -229,5 +238,69 @@ mod tests {
     #[test]
     fn test_binary_size() {
         assert_eq!(core::mem::size_of::<ProofOfOrigin>(), 256);
+    }
+
+    #[test]
+    fn test_binary_alignment() {
+        assert_eq!(core::mem::align_of::<ProofOfOrigin>(), 1);
+    }
+
+    #[test]
+    fn test_flags_roundtrip() {
+        let mut poo = ProofOfOrigin::zeroed();
+        poo.version = PROTOCOL_VERSION;
+        assert_eq!(poo.flags(), 0);
+        poo.set_flags(0x1234);
+        assert_eq!(poo.flags(), 0x1234);
+        // Ensure other reserved bytes remain zero
+        assert_eq!(poo.reserved[2..], [0u8; 7]);
+    }
+
+    #[test]
+    fn test_le_timestamp_hex() {
+        // Domain 1.3: timestamp=1700000000, flags=0x1234
+        let mut poo = ProofOfOrigin::zeroed();
+        poo.version = PROTOCOL_VERSION;
+        poo.timestamp = 1700000000u64.to_le_bytes();
+        poo.set_flags(0x1234);
+        let bytes = poo.to_bytes();
+        // version should be 0x01
+        assert_eq!(bytes[0], 0x01);
+        // flags (first 2 of reserved) should be 0x34, 0x12 (LE)
+        assert_eq!(bytes[1], 0x34);
+        assert_eq!(bytes[2], 0x12);
+        // timestamp should be LE: 1700000000 = 0x6553F100
+        // LE: 00 F1 53 65 00 00 00 00
+        assert_eq!(bytes[10], 0x00);
+        assert_eq!(bytes[11], 0xF1);
+        assert_eq!(bytes[12], 0x53);
+        assert_eq!(bytes[13], 0x65);
+        assert_eq!(bytes[14], 0x00);
+        assert_eq!(bytes[15], 0x00);
+        assert_eq!(bytes[16], 0x00);
+        assert_eq!(bytes[17], 0x00);
+    }
+
+    #[test]
+    fn test_from_bytes_rejects_nonzero_reserved_full() {
+        // All 9 reserved bytes must be zero
+        for i in 0..9 {
+            let mut bytes = [0u8; 256];
+            bytes[0] = PROTOCOL_VERSION;
+            bytes[1 + i] = 0xFF;
+            assert!(
+                ProofOfOrigin::from_bytes(&bytes).is_err(),
+                "reserved byte {} should be rejected",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_reserved_is_exactly_9_bytes() {
+        assert_eq!(
+            core::mem::size_of::<[u8; 9]>(),
+            core::mem::size_of_val(&ProofOfOrigin::zeroed().reserved)
+        );
     }
 }

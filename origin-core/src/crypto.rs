@@ -114,13 +114,15 @@ pub fn sign(secret: &SecretKey, message: &[u8]) -> Signature {
 }
 
 /// Verify a [`Signature`] against a message and [`PublicKey`].
+///
+/// Uses `verify_strict` to enforce canonical `S` values and reject
+/// signature malleability (Domain 9.1).
 pub fn verify(public: &PublicKey, message: &[u8], sig: &Signature) -> crate::error::Result<()> {
-    use ed25519_dalek::Verifier;
     let dalek_pub = ed25519_dalek::VerifyingKey::from_bytes(&public.0)
         .map_err(|e| crate::error::Error::Crypto(e.to_string()))?;
     let dalek_sig = ed25519_dalek::ed25519::Signature::from_bytes(&sig.0);
     dalek_pub
-        .verify(message, &dalek_sig)
+        .verify_strict(message, &dalek_sig)
         .map_err(|e| crate::error::Error::Crypto(e.to_string()))
 }
 

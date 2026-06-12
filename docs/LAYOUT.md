@@ -8,12 +8,12 @@ The binary format is a fixed-width 256-byte structure used for embedded provenan
 Offset  Size  Field
 ────────────────────
   0      1    version       (0x01)
-  1      1    reserved      (0x00)
-  2      8    timestamp     (big-endian u64, unix epoch seconds)
-  10     32   hash          (SHA-256 of artifact)
-  42     32   pubkey        (Ed25519 compressed public key)
-  74     64   signature     (Ed25519 R ‖ S)
-  138    118  reserved      (zero-filled)
+  1      9    reserved      (zero-filled; first 2 bytes = LE u16 flags)
+  10     8    timestamp     (little-endian u64, unix epoch seconds)
+  18     32   hash          (SHA-256 of artifact)
+  50     32   pubkey        (Ed25519 compressed public key)
+  82     64   signature     (Ed25519 R ‖ S)
+  146    110  reserved2     (zero-filled)
 ────────────────────
         256   total
 ```
@@ -25,12 +25,12 @@ Offset  Size  Field
 #[derive(Copy, Clone)]
 pub struct ProofOfOrigin {
     pub version: u8,        // 0x01
-    pub reserved: u8,       // 0x00
-    pub timestamp: [u8; 8], // big-endian
+    pub reserved: [u8; 9],  // zero-filled; [0..2] = LE u16 flags
+    pub timestamp: [u8; 8], // little-endian
     pub hash: [u8; 32],
     pub pubkey: [u8; 32],
     pub signature: [u8; 64],
-    pub reserved2: [u8; 118],
+    pub reserved2: [u8; 110],
 }
 ```
 
@@ -39,12 +39,12 @@ pub struct ProofOfOrigin {
 | Field | Constraint |
 |-------|-----------|
 | `version` | Must be `0x01`. Any other value is rejected. |
-| `reserved` | Must be `0x00`. Reserved for future protocol flags. |
-| `timestamp` | Decoded as big-endian `u64`. Must be ≤ 253402300799 (year 9999). |
+| `reserved` | All 9 bytes must be zero. The first 2 bytes encode a LE u16 flags word for future use. |
+| `timestamp` | Decoded as little-endian `u64`. Must be ≤ 253402300799 (year 9999). |
 | `hash` | Any 32 bytes. Interpreted as SHA-256. |
 | `pubkey` | Any 32 bytes except the Ed25519 identity point (all zeros). |
 | `signature` | Any 64 bytes. Passed directly to Ed25519 verification. |
-| `reserved2` | Must be all zeros. Rejected otherwise. |
+| `reserved2` | All 110 bytes must be zero. Rejected otherwise. |
 
 ## Zero-Allocation Verification
 

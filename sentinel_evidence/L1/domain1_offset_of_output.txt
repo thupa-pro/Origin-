@@ -1,0 +1,12 @@
+=== ProofOfOrigin Field Offsets (size_of = 256, align_of = 1) ===
+Field                    | Offset | Size
+version                  | 0      | 1
+reserved                 | 1      | 9 (bytes 0-1 = LE u16 flags)
+timestamp                | 10     | 8 (little-endian u64)
+hash                     | 18     | 32
+pubkey                   | 50     | 32
+signature                | 82     | 64
+reserved2                | 146    | 110
+Total                    |        | 256
+No padding between fields. #[repr(C, packed)] confirmed.
+bytemuck::Pod + Zeroable for zero-copy reinterpretation.
