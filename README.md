@@ -95,6 +95,10 @@ application; everything below is a service.
 
 **2 protocol bugs fixed**, 9 crates, 4 SDK packages, 3 formal verification artifacts (TLA+/Coq/Kani).
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
