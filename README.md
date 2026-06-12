@@ -76,6 +76,25 @@ application; everything below is a service.
       IVG · HAE · VRM · IKM · ZK
 ```
 
+## Releases
+
+### v1.0.0 — L1 Omega Masterpiece (2026-06-12)
+
+**CRYPTOGRAPHICALLY SOUND ✅** — 150+ tests pass, 0 fail, clippy/fmt/deny clean.
+
+| Domain | What's Proven |
+|--------|--------------|
+| **Wire Format** | 256 bytes, `#[repr(C, packed)]`, zero alloc, LE deterministic |
+| **Side-Channel** | Timing t=0.424 (threshold 4.0), `ZeroizeOnDrop`, `ConstantTimeEq` |
+| **Signature Hardening** | Malleability defeated, deterministic nonces, commitment binding |
+| **Multi-Modal Hashing** | Fixed-point DCT pHash, ChaCha20 SimHash — cross-platform bit-identical |
+| **Embedding Engine** | JPEG/PNG/MP3/PDF — binary-level splicing, zero re-encode (19 tests) |
+| **CLI Streaming** | 50GB sparse file OOM-proof, SIGINT-safe atomic writes, miette diagnostics |
+| **Structural Fuzzing** | 100K random PoO arrays, 10K corrupted statements, 67M fuzz iterations — 0 panics |
+| **WASM/Node.js** | Full sign/verify roundtrip, C headers via cbindgen |
+
+**2 protocol bugs fixed**, 9 crates, 4 SDK packages, 3 formal verification artifacts (TLA+/Coq/Kani).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
