@@ -12,6 +12,14 @@
 //! It is NOT a collision-resistant cryptographic hash. It is suitable for
 //! similarity comparison only and must NEVER be used as the sole basis for
 //! royalty, licensing, or any security-critical decision.
+//!
+//! # Important: pHash Adversarial Vulnerability (L3)
+//!
+//! The perceptual hash (`perceptual_hash`) is **NOT adversarial-robust**.
+//! An attacker with knowledge of the DCT-based algorithm can craft inputs
+//! that produce arbitrary pHash values. Do NOT use `perceptual_hash` as the
+//! sole basis for any security-critical or royalty determination in adversarial
+//! contexts. pHash is designed for benign similarity comparison only.
 
 extern crate alloc;
 
@@ -72,6 +80,13 @@ pub use statement::{
     Statement, build_statement, build_statement_from_hash, compare_semantic_models,
     encode_statement, verify_bls_statement, verify_model_compatibility, verify_statement,
     verify_statement_hash, verify_statement_hash_with_time, ModelMatch,
+};
+/// Re-export BLS types and functions including PoP verification.
+pub use bls::{
+    BlsPublicKey, BlsSignature, BlsSecretKey,
+    bls_aggregate_public_keys, bls_aggregate_signatures, bls_sign, bls_verify,
+    bls_verify_aggregate, bls_pop_prove, bls_pop_verify,
+    generate_bls_keypair_from_seed,
 };
 
 /// A specialized [`Result`] type for verification operations.

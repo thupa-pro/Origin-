@@ -46,14 +46,16 @@ fn test_11_1_l3_phash_adversarial_vulnerability() {
     // Check if pHash adversarial vulnerability is documented
     let layout = read_file(&format!("{}/docs/specs/LAYOUT.md", ROOT_DIR));
     let readme = read_file(&format!("{}/README.md", ROOT_DIR));
+    let lib_rs = read_file(&format!("{}/crates/origin-core/src/lib.rs", ROOT_DIR));
+    let hash_rs = read_file(&format!("{}/crates/origin-core/src/hash.rs", ROOT_DIR));
 
-    // Check for pHash limitation disclosure
-    let combined = format!("{} {}", layout, readme);
-    if combined.contains("adversarial") || combined.contains("NOT adversarial") {
-        eprintln!("11.1  L3: pHash adversarial vulnerability documented — PASS");
-    } else {
-        eprintln!("11.1  L3: WARN — pHash adversarial vulnerability not found in main docs");
-    }
+    // Check for pHash limitation disclosure in multiple locations
+    let combined = format!("{} {} {} {}", layout, readme, lib_rs, hash_rs);
+    assert!(
+        combined.contains("NOT adversarial") || combined.contains("adversarial-robust"),
+        "L3: pHash adversarial vulnerability must be documented in README, lib.rs, or hash.rs"
+    );
+    eprintln!("11.1  L3: pHash adversarial vulnerability documented — PASS");
 }
 
 // L4 — Offline policy staleness
@@ -100,14 +102,15 @@ fn test_11_1_l9_arweave_gdpr() {
     // Check if Arweave/GDPR limitation is documented
     let security = read_file(&format!("{}/SECURITY.md", ROOT_DIR));
     let doctrine = read_file(&format!("{}/ORIGIN_DOCTRINE.md", ROOT_DIR));
+    let readme = read_file(&format!("{}/README.md", ROOT_DIR));
 
-    // Check for GDPR or Arweave mention
-    let combined = format!("{} {}", security, doctrine);
-    if combined.contains("GDPR") || combined.contains("Arweave") {
-        eprintln!("11.1  L9: Arweave GDPR incompatibility documented — PASS");
-    } else {
-        eprintln!("11.1  L9: WARN — Arweave GDPR limitation not found in main docs");
-    }
+    // Check for GDPR or Arweave mention in any of these files
+    let combined = format!("{} {} {}", security, doctrine, readme);
+    assert!(
+        combined.contains("GDPR") || combined.contains("Arweave"),
+        "L9: Arweave GDPR incompatibility must be documented in SECURITY.md, ORIGIN_DOCTRINE.md, or README.md"
+    );
+    eprintln!("11.1  L9: Arweave GDPR incompatibility documented — PASS");
 }
 
 // What Cannot Be Verified (§4.2)
@@ -115,18 +118,23 @@ fn test_11_1_l9_arweave_gdpr() {
 fn test_11_1_cannot_be_verified() {
     // Check if "What Cannot Be Verified" limitations are documented
     let doctrine = read_file(&format!("{}/ORIGIN_DOCTRINE.md", ROOT_DIR));
+    let readme = read_file(&format!("{}/README.md", ROOT_DIR));
 
-    // The doctrine should mention limitations
     // Check for key limitation concepts
-    let has_limitations = doctrine.contains("NOT") ||
-                          doctrine.contains("limitation") ||
-                          doctrine.contains("cannot") ||
-                          doctrine.contains("We prove that");
+    let combined = format!("{} {}", doctrine, readme);
+    assert!(
+        combined.contains("What Cannot Be Verified") || combined.contains("does NOT prove"),
+        "What Cannot Be Verified limitations must be documented"
+    );
 
-    assert!(has_limitations,
-        "What Cannot Be Verified limitations must be documented");
+    // Temporal priority limitation (NP3)
+    assert!(
+        combined.contains("temporal priority") || combined.contains("creation priority") || combined.contains("timestamps are self-set"),
+        "NP3: Temporal priority limitation must be documented"
+    );
 
     eprintln!("11.1  What Cannot Be Verified: limitations documented — PASS");
+    eprintln!("11.1  NP3: Temporal priority limitation documented — PASS");
 }
 
 // ═══════════════════════════════════════════════════════════════════════

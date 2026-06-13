@@ -105,6 +105,12 @@ pub struct ProofOfOrigin {
 | 0x0040 | `OFFLINE_BUNDLE` | Offline bundle available for this artifact |
 | 0x0080 | `AI_GENERATED` | Human Content Score < 0.5 |
 
+> **Note on `AI_GENERATED` (0x0080):** The automatic triggering of this flag
+> based on HCS (Human Content Score) < 0.5 is a **service-layer concern**,
+> not enforced at the L1 protocol core. The L1 core stores the flag as given
+> by the caller. HCS computation and automatic flag setting should be
+> implemented in the application layer (e.g., origin-cli, origin-sdk).
+
 ## Zero-Allocation Verification
 
 Verification reads directly from a `&[u8; 256]` using `bytemuck::try_from_bytes`:

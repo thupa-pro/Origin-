@@ -1,5 +1,20 @@
 // SPDX-License-Identifier: MIT
 
+//! SHA-256 hashing utilities, perceptual hash (pHash-DCT), and semantic hash (SimHash).
+//!
+//! # pHash Adversarial Limitation (L3)
+//!
+//! The perceptual hash (`phash_64`) is **NOT adversarial-robust**. An attacker
+//! with knowledge of the DCT-based algorithm can craft inputs that produce
+//! arbitrary pHash values. Do NOT use `perceptual_hash` as the sole basis for
+//! any security-critical or royalty determination in adversarial contexts.
+//!
+//! # SimHash Cross-Implementation Interop (L2)
+//!
+//! SimHash uses deterministic random projection with a fixed seed. Cross-
+//! implementation interoperability requires identical algorithm parameters.
+//! See the `simhash_256` function documentation for details.
+
 use sha2::{Digest, Sha256};
 
 /// Compute the SHA-256 hash of the given byte slice.
@@ -53,6 +68,16 @@ pub fn hash_file(path: &std::path::Path) -> crate::error::Result<alloc::string::
 // ═══════════════════════════════════════════════
 // PERCEPTUAL HASH (pHash) — Fix-Point DCT
 // ═══════════════════════════════════════════════
+//
+// # Known Limitation: Adversarial Vulnerability (L3)
+//
+// pHash is **NOT adversarial-robust**. An attacker with knowledge of the
+// DCT-based algorithm can craft inputs that produce arbitrary pHash values.
+// Do NOT use `perceptual_hash` as the sole basis for any security-critical
+// or royalty determination in adversarial contexts.
+//
+// pHash is designed for benign similarity comparison (e.g., detecting
+// near-duplicate images in a trusted corpus). It is NOT a security feature.
 
 /// Convert RGB pixel data to grayscale using exact BT.601 coefficients.
 /// Input: width * height * 3 bytes (R, G, B interleaved).
@@ -237,6 +262,21 @@ pub fn classify_match(a: u64, b: u64) -> MatchLevel {
 // ═══════════════════════════════════════════════
 // SEMANTIC HASH (SimHash) — Random Projection
 // ═══════════════════════════════════════════════
+//
+// # Cross-Implementation Interop Requirement (L2)
+//
+// SimHash is a 256-bit dimensionality-reduced fingerprint computed via
+// random projection with a deterministic seed. Cross-implementation
+// interoperability requires identical:
+//   1. Seed: `SHA-256(b"origin-network-simhash-seed-v1")`
+//   2. RNG: ChaCha20 seeded with the above
+//   3. Box-Muller transform for Gaussian random vectors
+//   4. Feature vector layout: 512-dimensional, ordered consistently
+//
+// Different implementations MUST use the same algorithm parameters to
+// produce compatible semantic hashes. The `semantic_model_ver` field
+// identifies the model version; implementations MUST NOT compare
+// semantic hashes from different model versions.
 
 const SIMHASH_SEED: &[u8] = b"origin-network-simhash-seed-v1";
 

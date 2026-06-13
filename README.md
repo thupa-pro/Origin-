@@ -76,6 +76,39 @@ application; everything below is a service.
       IVG · HAE · VRM · IKM · ZK
 ```
 
+## Known Limitations (Spec §9)
+
+Every conforming implementation MUST communicate these to users:
+
+| ID | Limitation | Status |
+|----|-----------|--------|
+| **L1** | 256-byte format: only 8 reserved bytes for v2+ extensions. Migration via version byte. | Documented |
+| **L2** | `semantic_hash` is model-dependent (`semantic_model_ver` field). Cross-model comparison is undefined. | Documented |
+| **L3** | **pHash is NOT adversarial-robust.** Do not use `perceptual_hash` as the sole basis for any security-critical or royalty determination in adversarial contexts. An attacker can craft inputs that produce arbitrary pHash values. | Documented |
+| **L4** | `policy_hash` reflects policy AT SIGNING TIME. Current policy may differ. | Documented |
+| **L5** | **PoB completeness gap:** Declared training inputs may NOT be the complete set of all training inputs. PoB proves declared inputs satisfy policies, not that they are exhaustive. | Documented |
+| **L7** | During IVG network partitions, safe fallback (`research_only`) is served. Liveness is sacrificed for safety. | Documented |
+| **L9** | **MUST NOT use Arweave for GDPR-jurisdiction deployments.** Arweave's immutability conflicts with GDPR right-to-erasure. | Documented |
+
+### What Cannot Be Verified
+
+The Origin protocol proves a public key, timestamp, and artifact hash are bound.
+It does **NOT** prove:
+
+1. **Completeness of PoB declarations** — declared inputs may not be all inputs
+2. **HCS (Human Content Score) accuracy** — HCS is a heuristic, not a proof
+3. **Semantic hash model correctness** — model-dependent similarity is approximate
+4. **Causal artistic derivation** — timestamps prove existence, not creation order
+5. **Trust score accuracy** — trust scores are service-layer heuristics
+
+### Temporal Priority Limitation (NP3)
+
+Timestamps are self-set. A fast attacker can sign publicly available content
+before its actual creator. **Do NOT treat PoO timestamps as proof of creation
+priority.** Timestamps prove existence at a point in time, not originality.
+
+---
+
 ## Releases
 
 ### v1.0.0 — L1 Omega Masterpiece (2026-06-12)

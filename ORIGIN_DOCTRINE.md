@@ -65,6 +65,24 @@ See NON_GOALS.md (moved to docs/rfc/). Key items:
 - No encryption (provenance is public by design)
 - No revocation mechanism (provenance is immutable)
 
+## 4.1 WHAT CANNOT BE PROVEN
+
+The protocol proves a public key, timestamp, and artifact hash are bound.
+It explicitly does **NOT** prove:
+
+1. **Completeness of PoB declarations** — declared inputs may not be all inputs
+2. **HCS accuracy** — Human Content Score is a heuristic, not a proof
+3. **Semantic hash correctness** — model-dependent similarity is approximate
+4. **Causal artistic derivation** — timestamps prove existence, not creation order
+5. **Trust score accuracy** — trust scores are service-layer heuristics
+
+### Temporal Priority Limitation
+
+Timestamps are self-set. A fast attacker can sign publicly available content
+before its actual creator. PoO timestamps prove existence at a point in time,
+not creation priority. This is a fundamental limitation of self-attested
+timestamps and cannot be mitigated at the protocol layer.
+
 ## 5. THE CONTRACT WITH AUDITORS
 
 Every line of code in `crates/origin-core/` is auditable by a single

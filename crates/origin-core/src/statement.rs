@@ -342,6 +342,13 @@ pub fn verify_statement_hash(stmt: &Statement, actual_hash_hex: &str) -> Result<
 ///
 /// If `resolve_rulebook` is provided and semantic_model_ver != 0,
 /// attempts rulebook resolution. Returns `Error::IvgUnreachable` (E005) if fails.
+///
+/// # Temporal Priority Limitation (NP3)
+///
+/// **WARNING:** Timestamps are self-set. A fast attacker can sign publicly
+/// available content before its actual creator. Do NOT treat timestamps as
+/// proof of creation priority. Timestamps prove existence at a point in time,
+/// not originality.
 pub fn verify_statement_hash_with_time(
     stmt: &Statement,
     actual_hash_hex: &str,
@@ -408,12 +415,17 @@ pub fn verify_statement_hash_with_time(
 ///
 /// The PoO must have the `MULTI_AUTHOR` flag (0x0010) set.
 /// `bls_public_keys` must contain all public keys that participated
-/// in the aggregate signature. The aggregate signature must be a valid
-/// BLS aggregate of individual signatures on the same message (PoO prefix).
+/// in the aggregate signature. `bls_pops` must contain the corresponding
+/// Proof-of-Possession signatures for each public key. PoPs are verified
+/// BEFORE aggregation to prevent rogue-key attacks.
+///
+/// The aggregate signature must be a valid BLS aggregate of individual
+/// signatures on the same message (PoO prefix).
 pub fn verify_bls_statement(
     stmt: &Statement,
     actual_hash_hex: &str,
     bls_public_keys: &[crate::bls::BlsPublicKey],
+    bls_pops: &[crate::bls::BlsSignature],
 ) -> Result<()> {
     let expected_hash = &stmt.hash[7..];
     if actual_hash_hex != expected_hash {
@@ -444,6 +456,26 @@ pub fn verify_bls_statement(
         return Err(Error::IkmUnreachable {
             key: hex::encode(&stmt.key_bytes),
         });
+    }
+
+    if bls_pops.len() != bls_public_keys.len() {
+        return Err(Error::Format(alloc::format!(
+            "MULTI_AUTHOR: {} public keys but {} PoP signatures (must match)",
+            bls_public_keys.len(),
+            bls_pops.len()
+        )));
+    }
+
+    // CRITICAL: Verify all PoP signatures BEFORE aggregation
+    // This prevents rogue-key attacks where an adversary includes a key
+    // they don't control in the aggregate.
+    for (i, (pk, pop)) in bls_public_keys.iter().zip(bls_pops.iter()).enumerate() {
+        if !crate::bls::bls_pop_verify(pk, pop) {
+            return Err(Error::SignatureInvalid(alloc::format!(
+                "MULTI_AUTHOR: PoP verification failed for key {}",
+                i
+            )));
+        }
     }
 
     let bls_sig = crate::bls::BlsSignature::from_bytes(&stmt.sig_bytes[..48])?;

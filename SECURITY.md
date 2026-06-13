@@ -61,3 +61,19 @@ Out of scope:
 - `ZeroizeOnDrop` on all secret key types
 - Streaming I/O prevents memory exhaustion
 - `cargo-deny` blocks unpatched advisories in CI
+
+## Deployment Constraints
+
+### Arweave / GDPR (L9)
+
+**MUST NOT use Arweave for GDPR-jurisdiction deployments.** Arweave's
+immutability conflicts with GDPR right-to-erasure (Article 17). Once data
+is written to Arweave, it cannot be deleted. Use mutable storage with
+proper access controls for GDPR-regulated content.
+
+### Immutable Provenance
+
+PoO records are immutable by design. Revocation is a service-layer concern
+(IVG revocation sets), not a protocol-layer feature. A revoked PoO remains
+cryptographically valid — it is merely flagged as revoked in the revocation
+set.

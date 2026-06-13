@@ -3,6 +3,7 @@ use blst::min_sig::{self as bls_impl};
 use blst::BLST_ERROR;
 
 const DST: &[u8] = b"ORIGIN_BLS_SIG_V1";
+const POP_DST: &[u8] = b"ORIGIN_BLS_POP_V1";
 
 /// BLS public key: 96 bytes (G2 point, min_sig variant).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -75,6 +76,30 @@ pub fn bls_verify_aggregate(
         Err(_) => return false,
     };
     bls_verify(&agg_pk, msg, sig)
+}
+
+/// Generate a Proof-of-Possession (PoP) signature for a BLS keypair.
+///
+/// PoP proves the signer possesses the secret key corresponding to the public key.
+/// This prevents rogue-key attacks in aggregate signature schemes.
+///
+/// `pop = BLS.Sign(sk, "ORIGIN_BLS_POP_V1" || pk_compressed)`
+pub fn bls_pop_prove(secret: &BlsSecretKey, public_key: &BlsPublicKey) -> BlsSignature {
+    let mut msg = alloc::vec![0u8; 96 + POP_DST.len()];
+    msg[..POP_DST.len()].copy_from_slice(POP_DST);
+    msg[POP_DST.len()..].copy_from_slice(&public_key.0);
+    bls_sign(secret, &msg)
+}
+
+/// Verify a Proof-of-Possession (PoP) signature.
+///
+/// Returns `true` if the PoP is valid for the given public key.
+/// This MUST be verified before including a key in aggregate verification.
+pub fn bls_pop_verify(public_key: &BlsPublicKey, pop: &BlsSignature) -> bool {
+    let mut msg = alloc::vec![0u8; 96 + POP_DST.len()];
+    msg[..POP_DST.len()].copy_from_slice(POP_DST);
+    msg[POP_DST.len()..].copy_from_slice(&public_key.0);
+    bls_verify(public_key, &msg, pop)
 }
 
 impl BlsPublicKey {
@@ -237,5 +262,57 @@ mod tests {
             let sig = bls_sign(&sk, msg);
             assert_eq!(sig.0, first_sig.0, "BLS signatures must be deterministic");
         }
+    }
+
+    #[test]
+    fn test_bls_pop_prove_and_verify() {
+        let seed = [0x88u8; 32];
+        let (sk, pk) = generate_bls_keypair_from_seed(&seed);
+        let pop = bls_pop_prove(&sk, &pk);
+        assert!(bls_pop_verify(&pk, &pop), "PoP must verify for correct keypair");
+    }
+
+    #[test]
+    fn test_bls_pop_rejects_wrong_key() {
+        let seed1 = [0x99u8; 32];
+        let seed2 = [0xAAu8; 32];
+        let (sk1, pk1) = generate_bls_keypair_from_seed(&seed1);
+        let (_sk2, pk2) = generate_bls_keypair_from_seed(&seed2);
+        let pop1 = bls_pop_prove(&sk1, &pk1);
+        assert!(!bls_pop_verify(&pk2, &pop1), "PoP must reject when verified against wrong key");
+    }
+
+    #[test]
+    fn test_bls_pop_rejects_tampered_pop() {
+        let seed = [0xBBu8; 32];
+        let (sk, pk) = generate_bls_keypair_from_seed(&seed);
+        let mut pop = bls_pop_prove(&sk, &pk);
+        pop.0[0] ^= 0x01;
+        assert!(!bls_pop_verify(&pk, &pop), "PoP must reject when tampered");
+    }
+
+    #[test]
+    fn test_bls_pop_prevents_rogue_key_aggregate() {
+        // Rogue-key attack: adversary tries to include a key they don't control
+        // in the aggregate. Without PoP, this could shift the aggregate to their advantage.
+        let seed1 = [0xC1u8; 32];
+        let seed2 = [0xC2u8; 32];
+        let (sk1, pk1) = generate_bls_keypair_from_seed(&seed1);
+        let (sk2, pk2) = generate_bls_keypair_from_seed(&seed2);
+
+        // Generate valid PoPs
+        let pop1 = bls_pop_prove(&sk1, &pk1);
+        let pop2 = bls_pop_prove(&sk2, &pk2);
+
+        // Both PoPs must verify before aggregation
+        assert!(bls_pop_verify(&pk1, &pop1), "PoP1 must verify");
+        assert!(bls_pop_verify(&pk2, &pop2), "PoP2 must verify");
+
+        // Now aggregate and verify
+        let msg = b"rogue key prevention test";
+        let sig1 = bls_sign(&sk1, msg);
+        let sig2 = bls_sign(&sk2, msg);
+        let agg_sig = bls_aggregate_signatures(&[&sig1, &sig2]).unwrap();
+        assert!(bls_verify_aggregate(msg, &agg_sig, &[&pk1, &pk2]));
     }
 }

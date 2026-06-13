@@ -4,6 +4,23 @@
 //! Hybrid Attestation Engine (HAE+): parses TEE quotes (Intel TDX, AMD SEV-SNP,
 //! AWS Nitro) and generates zero-knowledge proofs of binding between a
 //! .origin statement and a trusted execution environment.
+//!
+//! # Known Limitation: PoB Completeness (L5)
+//!
+//! **CRITICAL DISCLOSURE:** Proof of Binding (PoB) proves that **declared**
+//! training inputs satisfy applicable policies. It does **NOT** prove that
+//! declared inputs are the **complete set** of all training inputs. A model
+//! creator can omit inputs from their PoB declaration, and the protocol has
+//! no mechanism to detect this omission. Any user-facing interface providing
+//! PoB functionality MUST prominently display this limitation.
+//!
+//! # Known Limitation: pHash Adversarial Vulnerability (L3)
+//!
+//! The perceptual hash (pHash) used in PoO is **NOT adversarial-robust**.
+//! An attacker with knowledge of the pHash algorithm can craft inputs that
+//! produce arbitrary pHash values. Do not use `perceptual_hash` as the sole
+//! basis for any security-critical or royalty determination in adversarial
+//! contexts.
 
 /// A parsed TEE attestation quote.
 pub struct TeeQuote {
