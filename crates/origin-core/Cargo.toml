@@ -24,6 +24,7 @@ subtle = { version = "2", default-features = false }
 rand_chacha = { version = "0.3", default-features = false, optional = true }
 rand_core = { version = "0.6", default-features = false, optional = true }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"], optional = true }
+blst = "0.3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 getrandom = { version = "0.2", default-features = false }

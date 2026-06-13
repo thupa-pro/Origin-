@@ -74,7 +74,11 @@ const PROTOCOL_VERSION: u8 = 0x01;
 // Flag bitmask definitions
 const FLAG_HW_ATTESTED: u16 = 0x0001;
 const FLAG_REVOCABLE: u16 = 0x0002;
+const FLAG_ZK_READY: u16 = 0x0004;
+const FLAG_PQ_READY: u16 = 0x0008;
 const FLAG_MULTI_AUTHOR: u16 = 0x0010;
+const FLAG_PRIVATE_POLICY: u16 = 0x0020;
+const FLAG_OFFLINE_BUNDLE: u16 = 0x0040;
 const FLAG_AI_GENERATED: u16 = 0x0080;
 
 /// Tool string used when no tool is specified.
@@ -111,6 +115,16 @@ impl ProofOfOrigin {
         // Validate public_key is well-formed (non-zero, not identity point)
         if poo.public_key.iter().all(|&b| b == 0) {
             return Err(Error::Format("public_key must not be all zeros".into()));
+        }
+
+        // When MULTI_AUTHOR flag is set, validate BLS signature format:
+        // bytes 0-47 = BLS aggregate sig, bytes 48-63 = 16 zero bytes (padding)
+        if result.is_multi_author() {
+            if result.signature[48..64].iter().any(|&b| b != 0) {
+                return Err(Error::Format(
+                    "MULTI_AUTHOR: BLS signature padding bytes 48-63 must be zero".into(),
+                ));
+            }
         }
 
         Ok(result)
@@ -209,6 +223,14 @@ impl ProofOfOrigin {
         prefix
     }
 
+    /// Extract the BLS aggregate signature from the signature field
+    /// when MULTI_AUTHOR flag is set (bytes 0-47).
+    pub fn bls_signature_bytes(&self) -> [u8; 48] {
+        let mut sig = [0u8; 48];
+        sig.copy_from_slice(&self.signature[..48]);
+        sig
+    }
+
     /// Check if this PoO's content hash appears in a revocation set.
     ///
     /// Returns `Error::PooRevoked` (E003) if the hash is found in the set.
@@ -226,7 +248,11 @@ impl ProofOfOrigin {
     pub fn has_flag(&self, flag: u16) -> bool { self.flags() & flag != 0 }
     pub fn is_hw_attested(&self) -> bool { self.has_flag(FLAG_HW_ATTESTED) }
     pub fn is_revocable(&self) -> bool { self.has_flag(FLAG_REVOCABLE) }
+    pub fn is_zk_ready(&self) -> bool { self.has_flag(FLAG_ZK_READY) }
+    pub fn is_pq_ready(&self) -> bool { self.has_flag(FLAG_PQ_READY) }
     pub fn is_multi_author(&self) -> bool { self.has_flag(FLAG_MULTI_AUTHOR) }
+    pub fn is_private_policy(&self) -> bool { self.has_flag(FLAG_PRIVATE_POLICY) }
+    pub fn is_offline_bundle(&self) -> bool { self.has_flag(FLAG_OFFLINE_BUNDLE) }
     pub fn is_ai_generated(&self) -> bool { self.has_flag(FLAG_AI_GENERATED) }
 }
 
@@ -394,6 +420,43 @@ mod tests {
         let result = per_hash(phash, &ch);
         assert_eq!(result.len(), 16);
         assert_eq!(result[..8], phash.to_be_bytes());
+    }
+
+    #[test]
+    fn test_multi_author_rejects_nonzero_padding() {
+        let mut bytes = [0u8; 256];
+        bytes[0] = 0x01;
+        bytes[1] = 0x01;
+        let mut poo = ProofOfOrigin::from_bytes(&bytes).unwrap();
+        poo.set_flags(FLAG_MULTI_AUTHOR);
+        // Set a non-zero byte in the BLS padding region (signature bytes 48-63)
+        poo.signature[48] = 0x01;
+        let encoded = poo.to_bytes();
+        let result = ProofOfOrigin::from_bytes(&encoded);
+        assert!(result.is_err(), "MULTI_AUTHOR PoO with non-zero padding must be rejected");
+    }
+
+    #[test]
+    fn test_multi_author_accepts_valid_padding() {
+        let mut bytes = [0u8; 256];
+        bytes[0] = 0x01;
+        bytes[1] = 0x01;
+        let mut poo = ProofOfOrigin::from_bytes(&bytes).unwrap();
+        poo.set_flags(FLAG_MULTI_AUTHOR);
+        // All 64 bytes of signature are zero — BLS sig bytes (0-47) + padding (48-63)
+        let encoded = poo.to_bytes();
+        let result = ProofOfOrigin::from_bytes(&encoded);
+        assert!(result.is_ok(), "MULTI_AUTHOR PoO with zero padding must be accepted");
+    }
+
+    #[test]
+    fn test_bls_signature_bytes() {
+        let mut poo = ProofOfOrigin::zeroed();
+        poo.signature[..8].copy_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04]);
+        let bls_sig = poo.bls_signature_bytes();
+        assert_eq!(bls_sig.len(), 48);
+        assert_eq!(bls_sig[..8], [0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04]);
+        assert_eq!(bls_sig[8..], [0u8; 40]);
     }
 
     #[test]

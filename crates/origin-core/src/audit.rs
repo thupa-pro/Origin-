@@ -44,14 +44,24 @@ fn timestamp_to_iso8601(ts: u64) -> String {
 /// Format a [`Statement`] into a human-readable audit string.
 pub fn audit(statement: &Statement) -> String {
     let iso = timestamp_to_iso8601(statement.time);
+    let semantic = if statement.semantic_model_ver == 0 {
+        String::from("none (model version 0)")
+    } else {
+        format!(
+            "model ver=0x{:02x}, hash truncated to 32 bytes (SimHash)",
+            statement.semantic_model_ver
+        )
+    };
     format!(
         "Statement Audit\n\
          ├─ Origin:  {}\n\
          ├─ Hash:    {}\n\
          ├─ Time:    {} ({})\n\
          ├─ Key:     {}\n\
+         ├─ Semantic: {}\n\
          └─ Sig:     {}",
-        statement.origin, statement.hash, iso, statement.time, statement.key_b64, statement.sig_b64,
+        statement.origin, statement.hash, iso, statement.time, statement.key_b64,
+        semantic, statement.sig_b64,
     )
 }
 

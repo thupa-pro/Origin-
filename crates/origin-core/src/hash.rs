@@ -212,9 +212,9 @@ pub enum MatchLevel {
 ///
 /// Formula: SHA-256(b"FORMAT_UNKNOWN" || content_hash)[0..16]
 pub fn phash_format_unknown(content_hash: &[u8; 32]) -> [u8; 16] {
-    let mut input = alloc::vec![0u8; 48];
-    input[..16].copy_from_slice(b"FORMAT_UNKNOWN\0\0");
-    input[16..48].copy_from_slice(content_hash);
+    let mut input = alloc::vec![0u8; 46];
+    input[..14].copy_from_slice(b"FORMAT_UNKNOWN");
+    input[14..46].copy_from_slice(content_hash);
     let h = hash_bytes(&input);
     let mut bytes = [0u8; 16];
     bytes.copy_from_slice(&h[..16]);

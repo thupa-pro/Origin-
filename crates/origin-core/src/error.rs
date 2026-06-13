@@ -78,9 +78,9 @@ impl fmt::Display for Error {
             }
             Error::PooRevoked(msg) => write!(f, "E003 POO_REVOKED: {}", msg),
             Error::IkmUnreachable { key } => {
-                write!(f, "E004 IKM_UNREACHABLE: cannot resolve key {}, using cached key with W001 warning", key)
+                write!(f, "E004 IKM_UNREACHABLE: cannot resolve key {} — key resolution unavailable in current deployment", key)
             }
-            Error::IvgUnreachable(msg) => write!(f, "E005 IVG_UNREACHABLE: research_only fallback only — NEVER commercial: {}", msg),
+            Error::IvgUnreachable(msg) => write!(f, "E005 IVG_UNREACHABLE: rulebook unavailable: {}", msg),
             Error::VersionUnknown { version, detail } => {
                 write!(f, "E006 VERSION_UNKNOWN: version=0x{:02x}, best-effort parse with W005 warning: {}", version, detail)
             }

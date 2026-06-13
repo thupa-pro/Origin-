@@ -4,6 +4,14 @@
 #![deny(unsafe_code)]
 
 //! Core types, functions, and re-exports for the Origin provenance library.
+//!
+//! # Important: Semantic Hash Truncation
+//!
+//! The `semantic_hash` field is a 256-bit SimHash (32 bytes). This is a
+//! dimensionality-reduced fingerprint of a 512-dimensional feature vector.
+//! It is NOT a collision-resistant cryptographic hash. It is suitable for
+//! similarity comparison only and must NEVER be used as the sole basis for
+//! royalty, licensing, or any security-critical decision.
 
 extern crate alloc;
 
@@ -11,6 +19,8 @@ extern crate alloc;
 pub mod audit;
 /// Binary serialization and deserialization.
 pub mod binary;
+/// BLS aggregate signature support (multi-author, RFC 8032 BLS12-381).
+pub mod bls;
 /// Cryptographic key generation, signing, and verification.
 pub mod crypto;
 /// Error types and results.
@@ -19,6 +29,12 @@ pub mod error;
 pub mod hash;
 /// Statement parsing, building, and verification.
 pub mod statement;
+/// C2PA content hash mapping for interoperability.
+#[cfg(feature = "std")]
+pub mod c2pa;
+/// HTTP Origin-Provenance header encoding and decoding.
+#[cfg(feature = "std")]
+pub mod http;
 #[cfg(target_arch = "wasm32")]
 /// WebAssembly API bindings.
 pub mod wasm_api;
@@ -54,8 +70,8 @@ pub use hash::phash_format_unknown;
 pub use hash::simhash_256;
 pub use statement::{
     Statement, build_statement, build_statement_from_hash, compare_semantic_models,
-    encode_statement, verify_model_compatibility, verify_statement, verify_statement_hash,
-    verify_statement_hash_with_time, ModelMatch,
+    encode_statement, verify_bls_statement, verify_model_compatibility, verify_statement,
+    verify_statement_hash, verify_statement_hash_with_time, ModelMatch,
 };
 
 /// A specialized [`Result`] type for verification operations.

@@ -141,16 +141,28 @@ fn read_secret_key(path: &std::path::Path) -> miette::Result<origin_core::Secret
         .map_err(|e| miette::miette!("failed to read secret key '{}': {}", path.display(), e))?;
     
     // Check if file is encrypted (has salt+nonce+ciphertext structure)
-    if data.len() >= 40 && data.len() > 40 {
-        // Prompt for passphrase
+    if data.len() > 40 {
         let passphrase = prompt_password("Enter passphrase for secret key: ")
             .map_err(|e| miette::miette!("failed to read passphrase: {}", e))?;
         let secret = decrypt_secret_key(&data, &passphrase)?;
         return origin_core::SecretKey::from_bytes(&secret).map_err(to_err);
     }
     
-    // Legacy: raw 32-byte key
-    origin_core::SecretKey::from_bytes(&data).map_err(to_err)
+    // Check if file looks like raw 32-byte key
+    if data.len() == 32 {
+        eprintln!(
+            "W003 WARNING: Reading raw unencrypted secret key from '{}'. \
+             Secret keys should be encrypted. Use `origin generate-key` to create an encrypted key.",
+            path.display()
+        );
+        return origin_core::SecretKey::from_bytes(&data).map_err(to_err);
+    }
+    
+    Err(miette::miette!(
+        "invalid key file '{}': unexpected length {} (expected encrypted key >40 bytes or raw 32-byte key)",
+        path.display(),
+        data.len()
+    ))
 }
 
 fn timestamp_now() -> u64 {
@@ -197,15 +209,34 @@ fn run(cli: Cli) -> miette::Result<Verdict> {
             let secret = read_secret_key(&key)?;
             let ts = time.unwrap_or_else(timestamp_now);
 
-            // P1.8: Warn when --time is more than 5 minutes in the future
-            if time.is_some() {
+            if let Some(_requested_ts) = time {
                 let now = timestamp_now();
+                // Reject timestamps before Origin protocol epoch (2024-01-01)
+                const MIN_TS: u64 = 1_704_067_200;
+                if ts < MIN_TS {
+                    return Err(miette::miette!(
+                        "--time {} is before the Origin protocol epoch ({}). \
+                         Cannot backdate a provenance statement before the protocol existed.",
+                        ts, MIN_TS
+                    ));
+                }
+                // Warn when --time is more than 5 minutes in the future
                 if ts > now.saturating_add(300) {
                     eprintln!(
                         "W002 WARNING: --time {} is {}s in the future (now={}). \
-                         This may indicate backdating or clock skew.",
+                         This may indicate clock skew.",
                         ts,
                         ts.saturating_sub(now),
+                        now
+                    );
+                }
+                // Warn when --time is more than 24 hours in the past
+                if now.saturating_sub(ts) > 86_400 {
+                    eprintln!(
+                        "W002 WARNING: --time {} is {}s in the past (now={}). \
+                         Backdating by more than 24 hours may erode trust.",
+                        ts,
+                        now.saturating_sub(ts),
                         now
                     );
                 }

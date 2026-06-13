@@ -379,14 +379,82 @@ pub fn verify_statement_hash_with_time(
         }
     }
 
-    // Reconstruct binary and verify Ed25519ph over prefix
+    // Reconstruct binary and verify signature
     let mut poo = crate::binary::ProofOfOrigin::from_statement(stmt)?;
     poo.tool_hash = crate::binary::compute_tool_hash(DEFAULT_TOOL_STRING);
     poo.signature = stmt.sig_bytes;
     let prefix = poo.signed_prefix();
+
+    if poo.is_multi_author() {
+        // MULTI_AUTHOR: signature is BLS aggregate (48 bytes) + 16 zero bytes
+        if stmt.sig_bytes[48..64].iter().any(|&b| b != 0) {
+            return Err(Error::Format(
+                "MULTI_AUTHOR: BLS signature bytes 48-63 must be zero".into(),
+            ));
+        }
+        // BLS public keys must be resolved externally; use verify_bls_statement
+        return Err(Error::IkmUnreachable {
+            key: hex::encode(&stmt.key_bytes),
+        });
+    }
+
+    // Ed25519ph verification (standard single-author path)
     let public_key = crypto::PublicKey::from_bytes(&stmt.key_bytes)?;
     let sig = crypto::Signature::from_bytes(&stmt.sig_bytes)?;
     crypto::verify_ph(&public_key, &prefix, &sig)
+}
+
+/// Verify a MULTI_AUTHOR statement using explicit BLS public keys.
+///
+/// The PoO must have the `MULTI_AUTHOR` flag (0x0010) set.
+/// `bls_public_keys` must contain all public keys that participated
+/// in the aggregate signature. The aggregate signature must be a valid
+/// BLS aggregate of individual signatures on the same message (PoO prefix).
+pub fn verify_bls_statement(
+    stmt: &Statement,
+    actual_hash_hex: &str,
+    bls_public_keys: &[crate::bls::BlsPublicKey],
+) -> Result<()> {
+    let expected_hash = &stmt.hash[7..];
+    if actual_hash_hex != expected_hash {
+        return Err(Error::ContentMismatch {
+            expected: expected_hash.to_string(),
+            actual: actual_hash_hex.to_string(),
+        });
+    }
+
+    let mut poo = crate::binary::ProofOfOrigin::from_statement(stmt)?;
+    poo.tool_hash = crate::binary::compute_tool_hash(DEFAULT_TOOL_STRING);
+    poo.signature = stmt.sig_bytes;
+    let prefix = poo.signed_prefix();
+
+    if !poo.is_multi_author() {
+        return Err(Error::Format(
+            "verify_bls_statement called on PoO without MULTI_AUTHOR flag".into(),
+        ));
+    }
+
+    if stmt.sig_bytes[48..64].iter().any(|&b| b != 0) {
+        return Err(Error::Format(
+            "MULTI_AUTHOR: BLS signature bytes 48-63 must be zero".into(),
+        ));
+    }
+
+    if bls_public_keys.is_empty() {
+        return Err(Error::IkmUnreachable {
+            key: hex::encode(&stmt.key_bytes),
+        });
+    }
+
+    let bls_sig = crate::bls::BlsSignature::from_bytes(&stmt.sig_bytes[..48])?;
+    let pk_refs: Vec<&crate::bls::BlsPublicKey> = bls_public_keys.iter().collect();
+    if crate::bls::bls_verify_aggregate(&prefix, &bls_sig, &pk_refs) {
+        Ok(())
+    } else {
+        Err(Error::SignatureInvalid(
+            "BLS aggregate signature verification failed".into(),
+        ))
+    }
 }
 
 /// Result of comparing two semantic model versions.
