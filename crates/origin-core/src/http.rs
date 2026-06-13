@@ -25,11 +25,11 @@
 
 use alloc::string::String;
 
+use crate::Verdict;
 use crate::binary::ProofOfOrigin;
 use crate::error::{Error, Result};
 use crate::hash;
-use crate::statement::{verify_statement_hash_with_time, Statement};
-use crate::Verdict;
+use crate::statement::{Statement, verify_statement_hash_with_time};
 
 /// HTTP header name for Origin Provenance
 pub const ORIGIN_PROVENANCE_HEADER: &str = "Origin-Provenance";
@@ -63,7 +63,10 @@ pub fn decode_origin_header(header_value: &str) -> Result<ProofOfOrigin> {
 
     // Decode base64url
     let bytes = crate::base64_decode(header_value).map_err(|e| {
-        Error::Format(alloc::format!("invalid base64url in Origin-Provenance: {}", e))
+        Error::Format(alloc::format!(
+            "invalid base64url in Origin-Provenance: {}",
+            e
+        ))
     })?;
 
     // Validate length

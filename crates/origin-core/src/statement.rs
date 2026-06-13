@@ -10,6 +10,12 @@ use crate::crypto;
 use crate::error::{Error, Result};
 use crate::hash;
 
+/// Type alias for DID resolver function.
+pub type DidResolver = dyn Fn(&str) -> Result<()>;
+
+/// Type alias for rulebook resolver function.
+pub type RulebookResolver = dyn Fn(&[u8; 32]) -> Result<()>;
+
 const PROTOCOL_VERSION: &str = "v1";
 const MAX_TIMESTAMP: u64 = 4294967295;
 const KEY_B64_LEN: usize = 44;
@@ -44,7 +50,9 @@ fn validate_hex_lowercase(s: &str, expected_len: usize) -> Result<()> {
         )));
     }
     if !s.as_bytes().iter().all(|b| HEX_CHARS.contains(b)) {
-        return Err(Error::Format("non-hex character or uppercase in hash".into()));
+        return Err(Error::Format(
+            "non-hex character or uppercase in hash".into(),
+        ));
     }
     Ok(())
 }
@@ -70,7 +78,8 @@ fn validate_base64url(s: &str, expected_str_len: usize, expected_bytes: usize) -
 
 impl Statement {
     pub fn parse(data: &[u8]) -> Result<Self> {
-        let text = core::str::from_utf8(data).map_err(|_| Error::Format("not valid UTF-8".into()))?;
+        let text =
+            core::str::from_utf8(data).map_err(|_| Error::Format("not valid UTF-8".into()))?;
 
         if data.starts_with(b"\xef\xbb\xbf") {
             return Err(Error::Format("BOM not allowed".into()));
@@ -116,7 +125,10 @@ impl Statement {
         for (i, line) in lines.iter().enumerate() {
             let sep = ": ";
             let Some(pos) = line.find(sep) else {
-                return Err(Error::Format(format!("line {}: missing ': ' separator", i + 1)));
+                return Err(Error::Format(format!(
+                    "line {}: missing ': ' separator",
+                    i + 1
+                )));
             };
             let key = &line[..pos];
             let value = &line[pos + sep.len()..];
@@ -127,13 +139,24 @@ impl Statement {
             if value.is_empty() {
                 return Err(Error::Format(format!("line {}: empty value", i + 1)));
             }
-            if value.starts_with(' ') || value.starts_with('\t') || value.ends_with(' ') || value.ends_with('\t') {
-                return Err(Error::Format(format!("line {}: leading or trailing whitespace in value", i + 1)));
+            if value.starts_with(' ')
+                || value.starts_with('\t')
+                || value.ends_with(' ')
+                || value.ends_with('\t')
+            {
+                return Err(Error::Format(format!(
+                    "line {}: leading or trailing whitespace in value",
+                    i + 1
+                )));
             }
             for c in value.chars() {
                 let cp = c as u32;
                 if (cp < 0x20 && cp != 0x0a) || cp == 0x7f {
-                    return Err(Error::Format(format!("line {}: control character U+{:04X} in value", i + 1, cp)));
+                    return Err(Error::Format(format!(
+                        "line {}: control character U+{:04X} in value",
+                        i + 1,
+                        cp
+                    )));
                 }
             }
             fields.push((key, value));
@@ -142,7 +165,12 @@ impl Statement {
         let mut seen_keys = HashSet::new();
         for (i, (key, _)) in fields.iter().enumerate() {
             if *key != VALID_KEYS[i] {
-                return Err(Error::Format(format!("line {}: expected key '{}', got '{}'", i + 1, VALID_KEYS[i], key)));
+                return Err(Error::Format(format!(
+                    "line {}: expected key '{}', got '{}'",
+                    i + 1,
+                    VALID_KEYS[i],
+                    key
+                )));
             }
             if !seen_keys.insert(key) {
                 return Err(Error::Format(format!("duplicate key '{}'", key)));
@@ -156,7 +184,10 @@ impl Statement {
         let sig_val = fields[4].1;
 
         if origin_val != PROTOCOL_VERSION {
-            return Err(Error::Format(format!("origin must be '{}', got '{}'", PROTOCOL_VERSION, origin_val)));
+            return Err(Error::Format(format!(
+                "origin must be '{}', got '{}'",
+                PROTOCOL_VERSION, origin_val
+            )));
         }
 
         let hash_prefix = "sha256:";
@@ -165,7 +196,8 @@ impl Statement {
         }
         let hash_hex = &hash_val[hash_prefix.len()..];
         validate_hex_lowercase(hash_hex, 64)?;
-        let hash_bytes = hex::decode(hash_hex).map_err(|e| Error::Format(alloc::format!("invalid hex: {}", e)))?;
+        let hash_bytes = hex::decode(hash_hex)
+            .map_err(|e| Error::Format(alloc::format!("invalid hex: {}", e)))?;
         let mut hb = [0u8; 32];
         hb.copy_from_slice(&hash_bytes);
 
@@ -173,11 +205,18 @@ impl Statement {
             return Err(Error::Format("timestamp must be ASCII digits".into()));
         }
         if time_val.len() > 1 && time_val.starts_with('0') {
-            return Err(Error::Format("timestamp must not have leading zeros".into()));
+            return Err(Error::Format(
+                "timestamp must not have leading zeros".into(),
+            ));
         }
-        let time: u64 = time_val.parse().map_err(|_| Error::Format("timestamp overflow".into()))?;
+        let time: u64 = time_val
+            .parse()
+            .map_err(|_| Error::Format("timestamp overflow".into()))?;
         if time > MAX_TIMESTAMP {
-            return Err(Error::Format(format!("timestamp {} exceeds maximum {}", time, MAX_TIMESTAMP)));
+            return Err(Error::Format(format!(
+                "timestamp {} exceeds maximum {}",
+                time, MAX_TIMESTAMP
+            )));
         }
 
         let key_raw = validate_base64url(key_val, KEY_B64_LEN, 32)?;
@@ -353,8 +392,8 @@ pub fn verify_statement_hash_with_time(
     stmt: &Statement,
     actual_hash_hex: &str,
     now: Option<u64>,
-    resolve_did: Option<&dyn Fn(&str) -> Result<()>>,
-    resolve_rulebook: Option<&dyn Fn(&[u8; 32]) -> Result<()>>,
+    resolve_did: Option<&DidResolver>,
+    resolve_rulebook: Option<&RulebookResolver>,
 ) -> Result<()> {
     let expected_hash = &stmt.hash[7..];
     if actual_hash_hex != expected_hash {
@@ -366,24 +405,27 @@ pub fn verify_statement_hash_with_time(
 
     // E007: clock-skew tolerance — warn when timestamp > now + 300
     // Per spec: warning only, does not hard-fail
-    if let Some(now) = now {
-        if stmt.time > now.saturating_add(300) {
-            #[cfg(feature = "std")]
-            eprintln!("W003 WARNING: {}", Error::TimestampFuture { ts: stmt.time, now });
-        }
+    if let Some(now) = now
+        && stmt.time > now.saturating_add(300)
+    {
+        #[cfg(feature = "std")]
+        eprintln!(
+            "W003 WARNING: {}",
+            Error::TimestampFuture { ts: stmt.time, now }
+        );
     }
 
     // E004: IKM resolution check
     if let Some(resolve) = resolve_did {
-        let did = format!("did:origin:{}", hex::encode(&stmt.key_bytes));
+        let did = format!("did:origin:{}", hex::encode(stmt.key_bytes));
         resolve(&did)?;
     }
 
     // E005: IVG resolution check for derivatives
-    if stmt.semantic_model_ver != 0 {
-        if let Some(resolve) = resolve_rulebook {
-            resolve(&stmt.hash_bytes)?;
-        }
+    if stmt.semantic_model_ver != 0
+        && let Some(resolve) = resolve_rulebook
+    {
+        resolve(&stmt.hash_bytes)?;
     }
 
     // Reconstruct binary and verify signature
@@ -401,7 +443,7 @@ pub fn verify_statement_hash_with_time(
         }
         // BLS public keys must be resolved externally; use verify_bls_statement
         return Err(Error::IkmUnreachable {
-            key: hex::encode(&stmt.key_bytes),
+            key: hex::encode(stmt.key_bytes),
         });
     }
 
@@ -454,7 +496,7 @@ pub fn verify_bls_statement(
 
     if bls_public_keys.is_empty() {
         return Err(Error::IkmUnreachable {
-            key: hex::encode(&stmt.key_bytes),
+            key: hex::encode(stmt.key_bytes),
         });
     }
 
@@ -529,15 +571,15 @@ pub fn compare_semantic_models(ver_a: u8, ver_b: u8) -> ModelMatch {
 /// If both PoOs have non-zero `semantic_model_ver`, compares them.
 /// Returns `Error::ModelMismatch` (E008) when versions differ.
 /// Per spec: MATCH_UNCOMPUTABLE (either version is 0) is treated as DERIVATIVE_PROBABLE.
-pub fn verify_model_compatibility(
-    child_ver: u8,
-    parent_ver: u8,
-) -> Result<()> {
+pub fn verify_model_compatibility(child_ver: u8, parent_ver: u8) -> Result<()> {
     match compare_semantic_models(child_ver, parent_ver) {
         ModelMatch::Exact => Ok(()),
         // Spec: MATCH_UNCOMPUTABLE treated as DERIVATIVE_PROBABLE → return E008
-        ModelMatch::Uncomputable | ModelMatch::DerivativeProbable | ModelMatch::DerivativeReview => {
-            Err(Error::ModelMismatch { ver_a: child_ver, ver_b: parent_ver })
-        }
+        ModelMatch::Uncomputable
+        | ModelMatch::DerivativeProbable
+        | ModelMatch::DerivativeReview => Err(Error::ModelMismatch {
+            ver_a: child_ver,
+            ver_b: parent_ver,
+        }),
     }
 }

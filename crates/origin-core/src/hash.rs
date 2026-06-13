@@ -44,7 +44,9 @@ pub fn hash_reader(mut reader: impl std::io::Read) -> crate::error::Result<[u8; 
     let mut hasher = Sha256::new();
     let mut buf = [0u8; 65536];
     loop {
-        let n = reader.read(&mut buf).map_err(|e| crate::error::Error::Io(e.to_string()))?;
+        let n = reader
+            .read(&mut buf)
+            .map_err(|e| crate::error::Error::Io(e.to_string()))?;
         if n == 0 {
             break;
         }
@@ -100,7 +102,13 @@ pub fn rgb_to_grayscale(pixels: &[u8], width: usize, height: usize) -> alloc::ve
 
 /// Bilinear interpolation to resize a grayscale image.
 #[cfg(feature = "std")]
-pub fn resize_bilinear(src: &[u8], src_w: usize, src_h: usize, dst_w: usize, dst_h: usize) -> alloc::vec::Vec<u8> {
+pub fn resize_bilinear(
+    src: &[u8],
+    src_w: usize,
+    src_h: usize,
+    dst_w: usize,
+    dst_h: usize,
+) -> alloc::vec::Vec<u8> {
     let mut dst = alloc::vec![0u8; dst_w * dst_h];
     for dy in 0..dst_h {
         for dx in 0..dst_w {
@@ -122,7 +130,7 @@ pub fn resize_bilinear(src: &[u8], src_w: usize, src_h: usize, dst_w: usize, dst
                 + v10 * fx * (1.0 - fy)
                 + v01 * (1.0 - fx) * fy
                 + v11 * fx * fy;
-            dst[dy * dst_w + dx] = v.round().min(255.0).max(0.0) as u8;
+            dst[dy * dst_w + dx] = v.round().clamp(0.0, 255.0) as u8;
         }
     }
     dst
@@ -155,12 +163,12 @@ pub fn phash_64(pixels_32x32: &[[u8; 32]; 32]) -> u64 {
 
     // Compute mean of 64 values (excluding DC at [0,0])
     let mut sum: i64 = 0;
-    for y in 0..8 {
-        for x in 0..8 {
+    for (y, row) in coeffs_8x8.iter().enumerate() {
+        for (x, &val) in row.iter().enumerate() {
             if x == 0 && y == 0 {
                 continue;
             }
-            sum += coeffs_8x8[y][x] as i64;
+            sum += val as i64;
         }
     }
     let mean = sum / 63;
@@ -169,12 +177,12 @@ pub fn phash_64(pixels_32x32: &[[u8; 32]; 32]) -> u64 {
     // Packed big-endian: byte 0 = MSB (coefficient[0][1]), byte 7 = LSB
     let mut hash: u64 = 0;
     let mut bit_idx = 0;
-    for y in 0..8 {
-        for x in 0..8 {
+    for (y, row) in coeffs_8x8.iter().enumerate() {
+        for (x, &val) in row.iter().enumerate() {
             if x == 0 && y == 0 {
                 continue;
             }
-            if coeffs_8x8[y][x] as i64 >= mean {
+            if val as i64 >= mean {
                 hash |= 1u64 << (63 - bit_idx); // big-endian packing
             }
             bit_idx += 1;
@@ -191,9 +199,9 @@ fn dct_2d_32x32(input: &[[i32; 32]; 32]) -> [[i32; 32]; 32] {
 
     // Precompute cosine table
     let mut cos_tab = [[0.0f64; N]; N];
-    for i in 0..N {
-        for j in 0..N {
-            cos_tab[i][j] = (core::f64::consts::PI * (i as f64 + 0.5) * j as f64 / N as f64).cos();
+    for (i, row) in cos_tab.iter_mut().enumerate() {
+        for (j, val) in row.iter_mut().enumerate() {
+            *val = (core::f64::consts::PI * (i as f64 + 0.5) * j as f64 / N as f64).cos();
         }
     }
 
@@ -206,8 +214,16 @@ fn dct_2d_32x32(input: &[[i32; 32]; 32]) -> [[i32; 32]; 32] {
                 }
             }
             // Orthogonal normalization: C(u) * C(v) where C(0) = 1/sqrt(2), C(k>0) = 1
-            let cu = if u == 0 { 1.0 / core::f64::consts::SQRT_2 } else { 1.0 };
-            let cv = if v == 0 { 1.0 / core::f64::consts::SQRT_2 } else { 1.0 };
+            let cu = if u == 0 {
+                1.0 / core::f64::consts::SQRT_2
+            } else {
+                1.0
+            };
+            let cv = if v == 0 {
+                1.0 / core::f64::consts::SQRT_2
+            } else {
+                1.0
+            };
             let norm = (2.0 / N as f64) * cu * cv;
             result[u][v] = (sum * norm).round() as i32;
         }
@@ -284,8 +300,8 @@ const SIMHASH_SEED: &[u8] = b"origin-network-simhash-seed-v1";
 #[cfg(feature = "std")]
 pub fn simhash_256(features: &[f64; 512]) -> [u8; 32] {
     use rand_chacha::ChaCha20Rng;
-    use rand_core::SeedableRng;
     use rand_core::RngCore;
+    use rand_core::SeedableRng;
 
     let seed_bytes = hash_bytes(SIMHASH_SEED);
     let mut rng = ChaCha20Rng::from_seed(seed_bytes);
@@ -397,7 +413,11 @@ mod tests {
         let hash_base = phash_64(&base);
         let hash_mod = phash_64(&modified);
         let dist = phash_hamming_distance(hash_base, hash_mod);
-        assert!(dist < 10, "Similar images should have Hamming distance < 10, got {}", dist);
+        assert!(
+            dist < 10,
+            "Similar images should have Hamming distance < 10, got {}",
+            dist
+        );
     }
 
     #[cfg(feature = "std")]
@@ -416,11 +436,11 @@ mod tests {
     #[test]
     fn test_resize_bilinear() {
         let mut src = alloc::vec![0u8; 256]; // 16x16 checkerboard
-            for i in 0..16 {
-                for j in 0..16 {
-                    src[i * 16 + j] = if (i / 2 + j / 2) % 2 == 0 { 255 } else { 0 };
-                }
+        for i in 0..16 {
+            for j in 0..16 {
+                src[i * 16 + j] = if (i / 2 + j / 2) % 2 == 0 { 255 } else { 0 };
             }
+        }
         let dst = resize_bilinear(&src, 16, 16, 32, 32);
         assert_eq!(dst.len(), 1024); // 32 * 32
     }

@@ -52,9 +52,8 @@ impl C2paHash {
             Error::Format("C2PA hash.data: missing null terminator for algorithm".into())
         })?;
 
-        let algorithm = core::str::from_utf8(&data[..algo_end]).map_err(|_| {
-            Error::Format("C2PA hash.data: invalid UTF-8 in algorithm".into())
-        })?;
+        let algorithm = core::str::from_utf8(&data[..algo_end])
+            .map_err(|_| Error::Format("C2PA hash.data: invalid UTF-8 in algorithm".into()))?;
 
         let hash = &data[algo_end + 1..];
         if hash.is_empty() {
@@ -97,7 +96,8 @@ pub fn c2pa_hash_to_origin(c2pa_hash: &C2paHash) -> [u8; 32] {
 
     // For other algorithms or non-standard lengths, hash the C2PA hash bytes
     // This ensures a consistent 32-byte output regardless of input format
-    let mut combined = alloc::vec::Vec::with_capacity(c2pa_hash.algorithm.len() + c2pa_hash.hash.len());
+    let mut combined =
+        alloc::vec::Vec::with_capacity(c2pa_hash.algorithm.len() + c2pa_hash.hash.len());
     combined.extend_from_slice(c2pa_hash.algorithm.as_bytes());
     combined.extend_from_slice(&c2pa_hash.hash);
     hash_bytes(&combined)

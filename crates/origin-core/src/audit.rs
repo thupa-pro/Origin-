@@ -60,8 +60,13 @@ pub fn audit(statement: &Statement) -> String {
          ├─ Key:     {}\n\
          ├─ Semantic: {}\n\
          └─ Sig:     {}",
-        statement.origin, statement.hash, iso, statement.time, statement.key_b64,
-        semantic, statement.sig_b64,
+        statement.origin,
+        statement.hash,
+        iso,
+        statement.time,
+        statement.key_b64,
+        semantic,
+        statement.sig_b64,
     )
 }
 

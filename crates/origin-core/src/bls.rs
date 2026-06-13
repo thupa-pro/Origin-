@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
-use blst::min_sig::{self as bls_impl};
 use blst::BLST_ERROR;
+use blst::min_sig::{self as bls_impl};
 
 const DST: &[u8] = b"ORIGIN_BLS_SIG_V1";
 const POP_DST: &[u8] = b"ORIGIN_BLS_POP_V1";
@@ -25,8 +25,7 @@ pub fn generate_bls_keypair_from_seed(seed: &[u8; 32]) -> (BlsSecretKey, BlsPubl
 }
 
 pub fn bls_sign(secret: &BlsSecretKey, msg: &[u8]) -> BlsSignature {
-    let sk = bls_impl::SecretKey::from_bytes(&secret.0)
-        .expect("valid 32-byte BLS secret key");
+    let sk = bls_impl::SecretKey::from_bytes(&secret.0).expect("valid 32-byte BLS secret key");
     let sig = sk.sign(msg, DST, b"");
     BlsSignature(sig.to_bytes())
 }
@@ -63,11 +62,7 @@ pub fn bls_aggregate_public_keys(pks: &[&BlsPublicKey]) -> Result<BlsPublicKey, 
     Ok(BlsPublicKey(agg.to_public_key().to_bytes()))
 }
 
-pub fn bls_verify_aggregate(
-    msg: &[u8],
-    sig: &BlsSignature,
-    public_keys: &[&BlsPublicKey],
-) -> bool {
+pub fn bls_verify_aggregate(msg: &[u8], sig: &BlsSignature, public_keys: &[&BlsPublicKey]) -> bool {
     if public_keys.is_empty() {
         return false;
     }
@@ -105,9 +100,10 @@ pub fn bls_pop_verify(public_key: &BlsPublicKey, pop: &BlsSignature) -> bool {
 impl BlsPublicKey {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::error::Error> {
         if bytes.len() != 96 {
-            return Err(crate::error::Error::Crypto(
-                alloc::format!("BLS public key must be 96 bytes, got {}", bytes.len()),
-            ));
+            return Err(crate::error::Error::Crypto(alloc::format!(
+                "BLS public key must be 96 bytes, got {}",
+                bytes.len()
+            )));
         }
         let mut key = [0u8; 96];
         key.copy_from_slice(bytes);
@@ -127,9 +123,10 @@ impl BlsPublicKey {
 impl BlsSignature {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::error::Error> {
         if bytes.len() != 48 {
-            return Err(crate::error::Error::Crypto(
-                alloc::format!("BLS signature must be 48 bytes, got {}", bytes.len()),
-            ));
+            return Err(crate::error::Error::Crypto(alloc::format!(
+                "BLS signature must be 48 bytes, got {}",
+                bytes.len()
+            )));
         }
         let mut sig = [0u8; 48];
         sig.copy_from_slice(bytes);
@@ -149,9 +146,10 @@ impl BlsSignature {
 impl BlsSecretKey {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::error::Error> {
         if bytes.len() != 32 {
-            return Err(crate::error::Error::Crypto(
-                alloc::format!("BLS secret key must be 32 bytes, got {}", bytes.len()),
-            ));
+            return Err(crate::error::Error::Crypto(alloc::format!(
+                "BLS secret key must be 32 bytes, got {}",
+                bytes.len()
+            )));
         }
         let mut key = [0u8; 32];
         key.copy_from_slice(bytes);
@@ -178,7 +176,10 @@ mod tests {
         let (sk, pk) = generate_bls_keypair_from_seed(&seed);
         let msg = b"test message for BLS signing";
         let sig = bls_sign(&sk, msg);
-        assert!(bls_verify(&pk, msg, &sig), "BLS verify must succeed for valid signature");
+        assert!(
+            bls_verify(&pk, msg, &sig),
+            "BLS verify must succeed for valid signature"
+        );
     }
 
     #[test]
@@ -186,7 +187,10 @@ mod tests {
         let seed = [0x02u8; 32];
         let (sk, pk) = generate_bls_keypair_from_seed(&seed);
         let sig = bls_sign(&sk, b"correct message");
-        assert!(!bls_verify(&pk, b"wrong message", &sig), "BLS must reject wrong message");
+        assert!(
+            !bls_verify(&pk, b"wrong message", &sig),
+            "BLS must reject wrong message"
+        );
     }
 
     #[test]
@@ -200,8 +204,8 @@ mod tests {
         let sig1 = bls_sign(&sk1, msg);
         let sig2 = bls_sign(&sk2, msg);
 
-        let agg_sig = bls_aggregate_signatures(&[&sig1, &sig2])
-            .expect("aggregate signatures must succeed");
+        let agg_sig =
+            bls_aggregate_signatures(&[&sig1, &sig2]).expect("aggregate signatures must succeed");
         let agg_verify = bls_verify_aggregate(msg, &agg_sig, &[&pk1, &pk2]);
         assert!(agg_verify, "BLS aggregate verify must succeed");
     }
@@ -218,12 +222,14 @@ mod tests {
         let sig2 = bls_sign(&sk1, msg); // both from sk1
 
         // Aggregate two signatures from same key
-        let agg_sig = bls_aggregate_signatures(&[&sig1, &sig2])
-            .expect("aggregate must succeed");
+        let agg_sig = bls_aggregate_signatures(&[&sig1, &sig2]).expect("aggregate must succeed");
 
         // Verify against pk1 + pk2 — should fail since pk2 didn't sign
         let result = bls_verify_aggregate(msg, &agg_sig, &[&pk1, &pk2]);
-        assert!(!result, "BLS aggregate must reject when one key didn't sign");
+        assert!(
+            !result,
+            "BLS aggregate must reject when one key didn't sign"
+        );
     }
 
     #[test]
@@ -269,7 +275,10 @@ mod tests {
         let seed = [0x88u8; 32];
         let (sk, pk) = generate_bls_keypair_from_seed(&seed);
         let pop = bls_pop_prove(&sk, &pk);
-        assert!(bls_pop_verify(&pk, &pop), "PoP must verify for correct keypair");
+        assert!(
+            bls_pop_verify(&pk, &pop),
+            "PoP must verify for correct keypair"
+        );
     }
 
     #[test]
@@ -279,7 +288,10 @@ mod tests {
         let (sk1, pk1) = generate_bls_keypair_from_seed(&seed1);
         let (_sk2, pk2) = generate_bls_keypair_from_seed(&seed2);
         let pop1 = bls_pop_prove(&sk1, &pk1);
-        assert!(!bls_pop_verify(&pk2, &pop1), "PoP must reject when verified against wrong key");
+        assert!(
+            !bls_pop_verify(&pk2, &pop1),
+            "PoP must reject when verified against wrong key"
+        );
     }
 
     #[test]

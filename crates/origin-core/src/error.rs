@@ -19,18 +19,35 @@ pub enum Error {
     Message(alloc::string::String),
     Format(alloc::string::String),
     Crypto(alloc::string::String),
-    HashMismatch { expected: alloc::string::String, actual: alloc::string::String },
+    HashMismatch {
+        expected: alloc::string::String,
+        actual: alloc::string::String,
+    },
     Io(alloc::string::String),
     Unattested(alloc::string::String),
     TrailingContent(alloc::string::String),
     SignatureInvalid(alloc::string::String),
-    ContentMismatch { expected: alloc::string::String, actual: alloc::string::String },
+    ContentMismatch {
+        expected: alloc::string::String,
+        actual: alloc::string::String,
+    },
     PooRevoked(alloc::string::String),
-    IkmUnreachable { key: alloc::string::String },
+    IkmUnreachable {
+        key: alloc::string::String,
+    },
     IvgUnreachable(alloc::string::String),
-    VersionUnknown { version: u8, detail: alloc::string::String },
-    TimestampFuture { ts: u64, now: u64 },
-    ModelMismatch { ver_a: u8, ver_b: u8 },
+    VersionUnknown {
+        version: u8,
+        detail: alloc::string::String,
+    },
+    TimestampFuture {
+        ts: u64,
+        now: u64,
+    },
+    ModelMismatch {
+        ver_a: u8,
+        ver_b: u8,
+    },
 }
 
 impl Error {
@@ -71,24 +88,51 @@ impl fmt::Display for Error {
             Error::Crypto(msg) => write!(f, "E001 SIGNATURE_INVALID: {}", msg),
             Error::SignatureInvalid(msg) => write!(f, "E001 SIGNATURE_INVALID: {}", msg),
             Error::HashMismatch { expected, actual } => {
-                write!(f, "E002 CONTENT_MISMATCH: Hash mismatch: expected {}, got {}", expected, actual)
+                write!(
+                    f,
+                    "E002 CONTENT_MISMATCH: Hash mismatch: expected {}, got {}",
+                    expected, actual
+                )
             }
             Error::ContentMismatch { expected, actual } => {
-                write!(f, "E002 CONTENT_MISMATCH: expected {}, got {}", expected, actual)
+                write!(
+                    f,
+                    "E002 CONTENT_MISMATCH: expected {}, got {}",
+                    expected, actual
+                )
             }
             Error::PooRevoked(msg) => write!(f, "E003 POO_REVOKED: {}", msg),
             Error::IkmUnreachable { key } => {
-                write!(f, "E004 IKM_UNREACHABLE: cannot resolve key {} — key resolution unavailable in current deployment", key)
+                write!(
+                    f,
+                    "E004 IKM_UNREACHABLE: cannot resolve key {} — key resolution unavailable in current deployment",
+                    key
+                )
             }
-            Error::IvgUnreachable(msg) => write!(f, "E005 IVG_UNREACHABLE: rulebook unavailable: {}", msg),
+            Error::IvgUnreachable(msg) => {
+                write!(f, "E005 IVG_UNREACHABLE: rulebook unavailable: {}", msg)
+            }
             Error::VersionUnknown { version, detail } => {
-                write!(f, "E006 VERSION_UNKNOWN: version=0x{:02x}, best-effort parse with W005 warning: {}", version, detail)
+                write!(
+                    f,
+                    "E006 VERSION_UNKNOWN: version=0x{:02x}, best-effort parse with W005 warning: {}",
+                    version, detail
+                )
             }
             Error::TimestampFuture { ts, now } => {
-                write!(f, "E007 TIMESTAMP_FUTURE: timestamp {} is {}s in the future (clock skew tolerated, warning only)", ts, ts.saturating_sub(*now))
+                write!(
+                    f,
+                    "E007 TIMESTAMP_FUTURE: timestamp {} is {}s in the future (clock skew tolerated, warning only)",
+                    ts,
+                    ts.saturating_sub(*now)
+                )
             }
             Error::ModelMismatch { ver_a, ver_b } => {
-                write!(f, "E008 MODEL_MISMATCH: semantic model version {} vs {}, MATCH_UNCOMPUTABLE — treated as DERIVATIVE_PROBABLE", ver_a, ver_b)
+                write!(
+                    f,
+                    "E008 MODEL_MISMATCH: semantic model version {} vs {}, MATCH_UNCOMPUTABLE — treated as DERIVATIVE_PROBABLE",
+                    ver_a, ver_b
+                )
             }
             Error::Io(msg) => write!(f, "I/O error: {}", msg),
             Error::Unattested(msg) => write!(f, "No provenance found: {}", msg),

@@ -29,26 +29,32 @@ pub mod audit;
 pub mod binary;
 /// BLS aggregate signature support (multi-author, RFC 8032 BLS12-381).
 pub mod bls;
+/// C2PA content hash mapping for interoperability.
+#[cfg(feature = "std")]
+pub mod c2pa;
 /// Cryptographic key generation, signing, and verification.
 pub mod crypto;
 /// Error types and results.
 pub mod error;
 /// SHA-256 hashing utilities.
 pub mod hash;
-/// Statement parsing, building, and verification.
-pub mod statement;
-/// C2PA content hash mapping for interoperability.
-#[cfg(feature = "std")]
-pub mod c2pa;
 /// HTTP Origin-Provenance header encoding and decoding.
 #[cfg(feature = "std")]
 pub mod http;
+/// Statement parsing, building, and verification.
+pub mod statement;
 #[cfg(target_arch = "wasm32")]
 /// WebAssembly API bindings.
 pub mod wasm_api;
 
 /// Re-export [`ProofOfOrigin`] from the `binary` module.
 pub use binary::ProofOfOrigin;
+/// Re-export BLS types and functions including PoP verification.
+pub use bls::{
+    BlsPublicKey, BlsSecretKey, BlsSignature, bls_aggregate_public_keys, bls_aggregate_signatures,
+    bls_pop_prove, bls_pop_verify, bls_sign, bls_verify, bls_verify_aggregate,
+    generate_bls_keypair_from_seed,
+};
 #[cfg(not(target_arch = "wasm32"))]
 /// Re-export [`generate_keypair`] from the `crypto` module.
 pub use crypto::generate_keypair;
@@ -71,22 +77,15 @@ pub use hash::hash_hex;
 pub use hash::hash_reader;
 #[cfg(feature = "std")]
 pub use hash::phash_64;
+pub use hash::phash_format_unknown;
 #[cfg(feature = "std")]
 pub use hash::phash_hamming_distance;
-pub use hash::phash_format_unknown;
 #[cfg(feature = "std")]
 pub use hash::simhash_256;
 pub use statement::{
-    Statement, build_statement, build_statement_from_hash, compare_semantic_models,
+    ModelMatch, Statement, build_statement, build_statement_from_hash, compare_semantic_models,
     encode_statement, verify_bls_statement, verify_model_compatibility, verify_statement,
-    verify_statement_hash, verify_statement_hash_with_time, ModelMatch,
-};
-/// Re-export BLS types and functions including PoP verification.
-pub use bls::{
-    BlsPublicKey, BlsSignature, BlsSecretKey,
-    bls_aggregate_public_keys, bls_aggregate_signatures, bls_sign, bls_verify,
-    bls_verify_aggregate, bls_pop_prove, bls_pop_verify,
-    generate_bls_keypair_from_seed,
+    verify_statement_hash, verify_statement_hash_with_time,
 };
 
 /// A specialized [`Result`] type for verification operations.
@@ -99,7 +98,11 @@ pub fn verify_bytes(statement_bytes: &[u8], artifact_bytes: &[u8]) -> Verdict {
 }
 
 /// Parse a statement and verify with optional clock-skew check (E007).
-pub fn verify_bytes_with_time(statement_bytes: &[u8], artifact_bytes: &[u8], now: Option<u64>) -> Verdict {
+pub fn verify_bytes_with_time(
+    statement_bytes: &[u8],
+    artifact_bytes: &[u8],
+    now: Option<u64>,
+) -> Verdict {
     let stmt = statement::Statement::parse(statement_bytes)?;
     let actual_hash = hash::hash_hex(artifact_bytes);
     verify_statement_hash_with_time(&stmt, &actual_hash, now, None, None)

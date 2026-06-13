@@ -101,14 +101,17 @@ impl ProofOfOrigin {
         }
 
         if poo.reserved.iter().any(|&b| b != 0) {
-            return Err(Error::Format("RESERVED bytes (182-189) must be zero-filled".into()));
+            return Err(Error::Format(
+                "RESERVED bytes (182-189) must be zero-filled".into(),
+            ));
         }
 
         // Bits 8-15 of flags must be zero in v1
         let flags = poo.flags();
         if flags & 0xFF00 != 0 {
             return Err(Error::Format(format!(
-                "flags bits 8-15 must be zero in v1, got 0x{:04x}", flags
+                "flags bits 8-15 must be zero in v1, got 0x{:04x}",
+                flags
             )));
         }
 
@@ -117,14 +120,10 @@ impl ProofOfOrigin {
             return Err(Error::Format("public_key must not be all zeros".into()));
         }
 
-        // When MULTI_AUTHOR flag is set, validate BLS signature format:
-        // bytes 0-47 = BLS aggregate sig, bytes 48-63 = 16 zero bytes (padding)
-        if result.is_multi_author() {
-            if result.signature[48..64].iter().any(|&b| b != 0) {
-                return Err(Error::Format(
-                    "MULTI_AUTHOR: BLS signature padding bytes 48-63 must be zero".into(),
-                ));
-            }
+        if result.is_multi_author() && result.signature[48..64].iter().any(|&b| b != 0) {
+            return Err(Error::Format(
+                "MULTI_AUTHOR: BLS signature padding bytes 48-63 must be zero".into(),
+            ));
         }
 
         Ok(result)
@@ -235,7 +234,7 @@ impl ProofOfOrigin {
     ///
     /// Returns `Error::PooRevoked` (E003) if the hash is found in the set.
     pub fn check_revocation(&self, revoked_hashes: &[[u8; 32]]) -> Result<()> {
-        if revoked_hashes.iter().any(|h| *h == self.content_hash) {
+        if revoked_hashes.contains(&self.content_hash) {
             return Err(Error::PooRevoked(alloc::format!(
                 "content hash {} is in revocation set",
                 hex::encode(self.content_hash)
@@ -245,18 +244,34 @@ impl ProofOfOrigin {
     }
 
     // Flag helpers
-    pub fn has_flag(&self, flag: u16) -> bool { self.flags() & flag != 0 }
-    pub fn is_hw_attested(&self) -> bool { self.has_flag(FLAG_HW_ATTESTED) }
-    pub fn is_revocable(&self) -> bool { self.has_flag(FLAG_REVOCABLE) }
-    pub fn is_zk_ready(&self) -> bool { self.has_flag(FLAG_ZK_READY) }
-    pub fn is_pq_ready(&self) -> bool { self.has_flag(FLAG_PQ_READY) }
-    pub fn is_multi_author(&self) -> bool { self.has_flag(FLAG_MULTI_AUTHOR) }
-    pub fn is_private_policy(&self) -> bool { self.has_flag(FLAG_PRIVATE_POLICY) }
-    pub fn is_offline_bundle(&self) -> bool { self.has_flag(FLAG_OFFLINE_BUNDLE) }
-    pub fn is_ai_generated(&self) -> bool { self.has_flag(FLAG_AI_GENERATED) }
+    pub fn has_flag(&self, flag: u16) -> bool {
+        self.flags() & flag != 0
+    }
+    pub fn is_hw_attested(&self) -> bool {
+        self.has_flag(FLAG_HW_ATTESTED)
+    }
+    pub fn is_revocable(&self) -> bool {
+        self.has_flag(FLAG_REVOCABLE)
+    }
+    pub fn is_zk_ready(&self) -> bool {
+        self.has_flag(FLAG_ZK_READY)
+    }
+    pub fn is_pq_ready(&self) -> bool {
+        self.has_flag(FLAG_PQ_READY)
+    }
+    pub fn is_multi_author(&self) -> bool {
+        self.has_flag(FLAG_MULTI_AUTHOR)
+    }
+    pub fn is_private_policy(&self) -> bool {
+        self.has_flag(FLAG_PRIVATE_POLICY)
+    }
+    pub fn is_offline_bundle(&self) -> bool {
+        self.has_flag(FLAG_OFFLINE_BUNDLE)
+    }
+    pub fn is_ai_generated(&self) -> bool {
+        self.has_flag(FLAG_AI_GENERATED)
+    }
 }
-
-
 
 /// Compute tool_hash = SHA-256(UTF-8 tool string)[0..15].
 pub fn compute_tool_hash(tool: &str) -> [u8; 16] {
@@ -316,7 +331,10 @@ mod tests {
 
     #[test]
     fn test_sum_check() {
-        assert_eq!(1 + 32 + 4 + 16 + 32 + 16 + 32 + 32 + 16 + 1 + 8 + 2 + 64, 256);
+        assert_eq!(
+            1 + 32 + 4 + 16 + 32 + 16 + 32 + 32 + 16 + 1 + 8 + 2 + 64,
+            256
+        );
     }
 
     #[test]
@@ -360,7 +378,7 @@ mod tests {
     fn test_rejects_nonzero_reserved() {
         let mut bytes = [0u8; 256];
         bytes[0] = PROTOCOL_VERSION;
-        bytes[1] = 0x01;  // valid public_key (non-zero)
+        bytes[1] = 0x01; // valid public_key (non-zero)
         bytes[182] = 0x01;
         assert!(ProofOfOrigin::from_bytes(&bytes).is_err());
     }
@@ -369,7 +387,7 @@ mod tests {
     fn test_rejects_flags_high_bits() {
         let mut bytes = [0u8; 256];
         bytes[0] = PROTOCOL_VERSION;
-        bytes[1] = 0x01;  // valid public_key (non-zero)
+        bytes[1] = 0x01; // valid public_key (non-zero)
         bytes[190] = 0x12; // bits 8-15 set in BE
         assert!(ProofOfOrigin::from_bytes(&bytes).is_err());
     }
@@ -433,7 +451,10 @@ mod tests {
         poo.signature[48] = 0x01;
         let encoded = poo.to_bytes();
         let result = ProofOfOrigin::from_bytes(&encoded);
-        assert!(result.is_err(), "MULTI_AUTHOR PoO with non-zero padding must be rejected");
+        assert!(
+            result.is_err(),
+            "MULTI_AUTHOR PoO with non-zero padding must be rejected"
+        );
     }
 
     #[test]
@@ -446,7 +467,10 @@ mod tests {
         // All 64 bytes of signature are zero — BLS sig bytes (0-47) + padding (48-63)
         let encoded = poo.to_bytes();
         let result = ProofOfOrigin::from_bytes(&encoded);
-        assert!(result.is_ok(), "MULTI_AUTHOR PoO with zero padding must be accepted");
+        assert!(
+            result.is_ok(),
+            "MULTI_AUTHOR PoO with zero padding must be accepted"
+        );
     }
 
     #[test]
@@ -455,7 +479,10 @@ mod tests {
         poo.signature[..8].copy_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04]);
         let bls_sig = poo.bls_signature_bytes();
         assert_eq!(bls_sig.len(), 48);
-        assert_eq!(bls_sig[..8], [0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04]);
+        assert_eq!(
+            bls_sig[..8],
+            [0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04]
+        );
         assert_eq!(bls_sig[8..], [0u8; 40]);
     }
 
@@ -482,7 +509,8 @@ mod tests {
             let timestamp = v["timestamp"].as_u64().unwrap();
             let expected_hex = v["expected_bytes_hex"].as_str().unwrap();
 
-            let seed = hex::decode(seed_hex).unwrap_or_else(|_| panic!("vector {}: invalid seed_hex", id));
+            let seed =
+                hex::decode(seed_hex).unwrap_or_else(|_| panic!("vector {}: invalid seed_hex", id));
             assert_eq!(seed.len(), 32, "vector {}: seed must be 32 bytes", id);
             let mut seed_arr = [0u8; 32];
             seed_arr.copy_from_slice(&seed);
@@ -497,10 +525,7 @@ mod tests {
             poo.tool_hash = compute_tool_hash("origin-cli");
             let actual_hex = hex::encode(poo.to_bytes());
 
-            assert_eq!(
-                actual_hex, expected_hex,
-                "Vector {} mismatch", id
-            );
+            assert_eq!(actual_hex, expected_hex, "Vector {} mismatch", id);
         }
     }
 }
