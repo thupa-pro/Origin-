@@ -72,6 +72,12 @@ unsafe impl bytemuck::Pod for ProofOfOrigin {}
 
 const PROTOCOL_VERSION: u8 = 0x01;
 // Flag bitmask definitions
+//
+// POLICY NOTE: These flags are **stored** by L1 but their policy enforcement
+// (e.g. "HW_ATTESTED only set inside TEE", "AI_GENERATED set when HCS < 0.5",
+// "REVOCABLE set when IVG revocation permitted") is a service-layer concern.
+// L1 core does not enforce these policies — it records what the caller provides.
+// Service layers (L2–L5) are responsible for policy validation.
 const FLAG_HW_ATTESTED: u16 = 0x0001;
 const FLAG_REVOCABLE: u16 = 0x0002;
 const FLAG_ZK_READY: u16 = 0x0004;

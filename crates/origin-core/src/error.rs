@@ -110,6 +110,10 @@ impl fmt::Display for Error {
                 )
             }
             Error::IvgUnreachable(msg) => {
+                // POLICY: E005 indicates IVG is unreachable. The caller should
+                // enforce research-only fallback; commercial use MUST NOT proceed
+                // without IVG. This policy classification is a service-layer
+                // (L2) concern, not enforced by L1 core.
                 write!(f, "E005 IVG_UNREACHABLE: rulebook unavailable: {}", msg)
             }
             Error::VersionUnknown { version, detail } => {

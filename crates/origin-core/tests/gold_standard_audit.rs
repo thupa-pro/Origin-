@@ -835,13 +835,13 @@ fn d_appendix_a3_endianness() {
 }
 
 #[test]
-fn d_test_vectors_5_vectors() {
+fn d_test_vectors_9_vectors() {
     let path = format!("{}/../../tests/interop/test_vectors/poo_v1.json", env!("CARGO_MANIFEST_DIR"));
     let data = std::fs::read_to_string(&path)
         .unwrap_or_else(|_| panic!("test vectors not found at {}", path));
     let vectors: serde_json::Value = serde_json::from_str(&data).unwrap();
     let vectors = vectors["vectors"].as_array().unwrap();
-    assert_eq!(vectors.len(), 5);
+    assert_eq!(vectors.len(), 9);
     for v in vectors {
         eprintln!("  Vector {}: len={}, ts={}",
             v["id"].as_i64().unwrap(),

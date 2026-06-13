@@ -9,11 +9,26 @@
 //! arbitrary pHash values. Do NOT use `perceptual_hash` as the sole basis for
 //! any security-critical or royalty determination in adversarial contexts.
 //!
+//! # Image Pipeline Note (L1)
+//!
+//! Image file decoding (PNG/JPEG → RGB pixel array) is **not performed by this
+//! crate**. The caller must supply decoded RGB pixel data to `rgb_to_grayscale()`.
+//! This crate provides the post-decode pipeline: RGB→grayscale conversion,
+//! bilinear resize, and DCT-based pHash computation.
+//!
 //! # SimHash Cross-Implementation Interop (L2)
 //!
 //! SimHash uses deterministic random projection with a fixed seed. Cross-
 //! implementation interoperability requires identical algorithm parameters.
 //! See the `simhash_256` function documentation for details.
+//!
+//! # SimHash 32-Byte Truncation (L1 Disclosure)
+//!
+//! The semantic hash is a **256-bit fingerprint** (32 bytes). Collision
+//! probability follows the birthday bound for a 256-bit space (~2^128
+//! operations). Applications that require higher collision resistance
+//! should combine SimHash with the full 32-byte content hash. This
+//! 32-byte limitation is inherent to the fixed-width 256-byte PoO format.
 
 use sha2::{Digest, Sha256};
 
