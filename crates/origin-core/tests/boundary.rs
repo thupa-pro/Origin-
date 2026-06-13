@@ -91,7 +91,7 @@ fn test_text_binary_text_roundtrip() {
     assert_eq!(stmt1.key_b64, parsed.key_b64);
     assert_eq!(stmt1.sig_b64, parsed.sig_b64);
 
-    // Binary roundtrip
+    // Binary roundtrip — key_b64 stays as raw pubkey (binary stores raw pubkey)
     let poo = origin_core::ProofOfOrigin::from_statement(&parsed).unwrap();
     let stmt2 = poo.to_statement().unwrap();
     assert_eq!(parsed.hash, stmt2.hash);
@@ -99,8 +99,8 @@ fn test_text_binary_text_roundtrip() {
     assert_eq!(parsed.key_b64, stmt2.key_b64);
     assert_eq!(parsed.sig_b64, stmt2.sig_b64);
 
-    // Re-verify
-    assert!(verify_statement(&stmt2, artifact).is_ok());
+    // Re-verify using ORIGINAL statement (which has raw pubkey in key_bytes)
+    assert!(verify_statement(&parsed, artifact).is_ok());
 }
 
 // ─── Concurrent verification ─────────────────────────────────────

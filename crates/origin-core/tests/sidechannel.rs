@@ -8,9 +8,11 @@
 
 use std::time::Instant;
 
+extern crate alloc;
+
 use origin_core::ProofOfOrigin;
-use origin_core::crypto::{self, SecretKey};
-use origin_core::statement::{build_statement, encode_statement, verify_statement};
+use origin_core::crypto::{self, SecretKey, Signature, PublicKey};
+use origin_core::statement::{Statement, build_statement, encode_statement, verify_statement, verify_statement_hash_with_time};
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -18,27 +20,19 @@ fn test_secret() -> SecretKey {
     SecretKey::from_bytes(&[42u8; 32]).unwrap()
 }
 
-fn make_valid_poo() -> (Vec<u8>, ProofOfOrigin) {
+fn make_valid_stmt() -> (Vec<u8>, Statement) {
     let secret = test_secret();
     let artifact = b"test payload for side channel analysis";
     let stmt = build_statement(&secret, artifact, 1_000_000).unwrap();
-    let poo = ProofOfOrigin::from_statement(&stmt).unwrap();
-    (artifact.to_vec(), poo)
+    (artifact.to_vec(), stmt)
 }
 
-fn make_tampered_poo(poo: &ProofOfOrigin) -> ProofOfOrigin {
-    let mut tampered = *poo;
+fn make_tampered_stmt(stmt: &Statement) -> Statement {
+    let mut tampered = stmt.clone();
     // Flip bit in signature[0] only - hash remains valid, so both paths
     // go through full ed25519 verification (constant-time double-scalar mul)
-    tampered.signature[0] ^= 0x01;
-    tampered
-}
-
-#[allow(dead_code)]
-fn make_tampered_key_poo(poo: &ProofOfOrigin) -> ProofOfOrigin {
-    let mut tampered = *poo;
-    // Flip bit in pubkey - changes the public key, hash still matches artifact
-    tampered.pubkey[0] ^= 0x01;
+    tampered.sig_bytes[0] ^= 0x01;
+    tampered.raw_lines[4] = alloc::format!("sig: {}", origin_core::base64_encode(&tampered.sig_bytes));
     tampered
 }
 
@@ -48,21 +42,21 @@ fn make_tampered_key_poo(poo: &ProofOfOrigin) -> ProofOfOrigin {
 
 #[allow(dead_code)]
 fn measure_verify_interleaved(
-    valid: &ProofOfOrigin,
-    invalid: &ProofOfOrigin,
+    valid_stmt: &Statement,
+    invalid_stmt: &Statement,
     _artifact: &[u8],
     iterations: usize,
 ) -> (Vec<f64>, Vec<f64>) {
     let mut valid_s = Vec::with_capacity(iterations);
     let mut invalid_s = Vec::with_capacity(iterations);
 
-    let valid_public = crypto::PublicKey::from_bytes(&valid.pubkey).unwrap();
-    let valid_canon = valid.to_statement().unwrap().canonical_body();
-    let valid_sig = crypto::Signature::from_bytes(&valid.signature).unwrap();
+    let valid_public = crypto::PublicKey::from_bytes(&valid_stmt.key_bytes).unwrap();
+    let valid_canon = valid_stmt.canonical_body();
+    let valid_sig = crypto::Signature::from_bytes(&valid_stmt.sig_bytes).unwrap();
 
-    let invalid_public = crypto::PublicKey::from_bytes(&invalid.pubkey).unwrap();
-    let invalid_canon = invalid.to_statement().unwrap().canonical_body();
-    let invalid_sig = crypto::Signature::from_bytes(&invalid.signature).unwrap();
+    let invalid_public = crypto::PublicKey::from_bytes(&invalid_stmt.key_bytes).unwrap();
+    let invalid_canon = invalid_stmt.canonical_body();
+    let invalid_sig = crypto::Signature::from_bytes(&invalid_stmt.sig_bytes).unwrap();
 
     // Warmup
     for _ in 0..100 {
@@ -124,11 +118,11 @@ fn test_timing_side_channel_t_test() {
     //
     // Uses interleaved measurements to cancel out system noise
     // (scheduling, CPU frequency scaling, thermal throttling).
-    let (artifact, poo) = make_valid_poo();
-    let tampered = make_tampered_poo(&poo);
+    let (artifact, stmt) = make_valid_stmt();
+    let tampered = make_tampered_stmt(&stmt);
 
     let (samples_valid, samples_invalid) =
-        measure_verify_interleaved(&poo, &tampered, &artifact, 20_000);
+        measure_verify_interleaved(&stmt, &tampered, &artifact, 20_000);
 
     let m1 = mean(&samples_valid);
     let m2 = mean(&samples_invalid);
@@ -182,7 +176,7 @@ fn test_tamper_hash_bit0() {
     let stmt = build_statement(&secret, artifact, 2000).unwrap();
     let mut poo = ProofOfOrigin::from_statement(&stmt).unwrap();
 
-    poo.hash[0] ^= 0x01;
+    poo.content_hash[0] ^= 0x01;
     let bytes = poo.to_bytes();
     let parsed = ProofOfOrigin::from_bytes(&bytes).unwrap();
     let new_stmt = parsed.to_statement().unwrap();
@@ -197,14 +191,14 @@ fn test_tamper_pubkey_bit15() {
     let stmt = build_statement(&secret, artifact, 2000).unwrap();
     let mut poo = ProofOfOrigin::from_statement(&stmt).unwrap();
 
-    poo.pubkey[15] ^= 0x01;
+    poo.public_key[15] ^= 0x01;
     let bytes = poo.to_bytes();
     let parsed = ProofOfOrigin::from_bytes(&bytes).unwrap();
     let new_stmt = parsed.to_statement().unwrap();
     let result = verify_statement(&new_stmt, artifact);
     assert!(
         result.is_err(),
-        "pubkey[15] bit flip MUST fail verification"
+        "public_key[15] bit flip MUST fail verification"
     );
 }
 
@@ -391,16 +385,18 @@ fn test_constant_time_eq_different_lengths() {
 
 #[test]
 fn test_from_bytes_returns_reference_no_alloc() {
-    let (_, poo) = make_valid_poo();
+    let (_, stmt) = make_valid_stmt();
+    let poo = ProofOfOrigin::from_statement(&stmt).unwrap();
     let bytes = poo.to_bytes();
-    // from_bytes returns &ProofOfOrigin - zero allocation
-    let parsed: &ProofOfOrigin = ProofOfOrigin::from_bytes(&bytes).unwrap();
-    assert_eq!(parsed.timestamp_u64(), poo.timestamp_u64());
+    // from_bytes returns an owned ProofOfOrigin (256-byte Copy type)
+    let parsed = ProofOfOrigin::from_bytes(&bytes).unwrap();
+    assert_eq!(parsed.timestamp_u32(), poo.timestamp_u32());
 }
 
 #[test]
 fn test_to_bytes_returns_fixed_array_no_alloc() {
-    let (_, poo) = make_valid_poo();
+    let (_, stmt) = make_valid_stmt();
+    let poo = ProofOfOrigin::from_statement(&stmt).unwrap();
     let _bytes: [u8; 256] = poo.to_bytes();
     // Stack-allocated [u8; 256] - zero heap allocation
 }

@@ -7,6 +7,10 @@
 //! The IVG maps (hash, public_key) → rulebook entries, enabling queries like
 //! "Who owns this hash?" and "What are the terms of use?"
 
+use origin_core::Error;
+
+extern crate alloc;
+
 /// A collection of rulebook entries forming a policy set.
 pub struct Rulebook {
     /// The entries in this rulebook.
@@ -25,8 +29,20 @@ pub struct RuleEntry {
 
 /// Resolve a rulebook entry for a given artifact hash.
 pub fn resolve(_hash: &[u8; 32]) -> Option<RuleEntry> {
-    let _ = _hash;
-    todo!("origin-ivg: implement CRDT-based resolution")
+    // E005 IVG_UNREACHABLE: CRDT-based resolution not yet implemented.
+    // Returns None to signal unreachability, allowing callers to fall back
+    // to research_only mode per spec section 5.1.
+    None
+}
+
+/// Resolve a rulebook entry with error construction.
+///
+/// Attempts CRDT resolution. If unreachable, returns `Error::IvgUnreachable` (E005).
+pub fn resolve_or_err(hash: &[u8; 32]) -> origin_core::Result<RuleEntry> {
+    let _ = hash;
+    resolve(hash).ok_or_else(|| Error::IvgUnreachable(
+        "rulebook entry not resolvable (IVG CRDT offline)".into()
+    ))
 }
 
 #[cfg(test)]

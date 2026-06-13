@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-#![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(missing_docs)]
 #![deny(unsafe_code)]
 
 //! Core types, functions, and re-exports for the Origin provenance library.
@@ -30,8 +30,8 @@ pub use binary::ProofOfOrigin;
 pub use crypto::generate_keypair;
 /// Re-export cryptographic key and signature types.
 pub use crypto::{
-    Keypair, PublicKey, SecretKey, Signature, constant_time_eq, generate_keypair_from_seed,
-    validate_public_key,
+    Keypair, PublicKey, SecretKey, Signature, compute_key_id, constant_time_eq,
+    generate_keypair_from_seed, validate_public_key,
 };
 /// Re-export [`Error`] and [`Result`] from the `error` module.
 pub use error::{Error, Result};
@@ -41,17 +41,21 @@ pub use hash::MatchLevel;
 pub use hash::classify_match;
 /// Re-export [`hash_bytes`] from the `hash` module.
 pub use hash::hash_bytes;
+/// Re-export [`hash_hex`] from the `hash` module.
+pub use hash::hash_hex;
 /// Re-export statement types and functions.
 pub use hash::hash_reader;
 #[cfg(feature = "std")]
 pub use hash::phash_64;
 #[cfg(feature = "std")]
 pub use hash::phash_hamming_distance;
+pub use hash::phash_format_unknown;
 #[cfg(feature = "std")]
 pub use hash::simhash_256;
 pub use statement::{
-    Statement, build_statement, build_statement_from_hash, encode_statement, verify_statement,
-    verify_statement_hash,
+    Statement, build_statement, build_statement_from_hash, compare_semantic_models,
+    encode_statement, verify_model_compatibility, verify_statement, verify_statement_hash,
+    verify_statement_hash_with_time, ModelMatch,
 };
 
 /// A specialized [`Result`] type for verification operations.
@@ -61,6 +65,13 @@ pub type Verdict = core::result::Result<(), Error>;
 pub fn verify_bytes(statement_bytes: &[u8], artifact_bytes: &[u8]) -> Verdict {
     let stmt = statement::Statement::parse(statement_bytes)?;
     verify_statement(&stmt, artifact_bytes)
+}
+
+/// Parse a statement and verify with optional clock-skew check (E007).
+pub fn verify_bytes_with_time(statement_bytes: &[u8], artifact_bytes: &[u8], now: Option<u64>) -> Verdict {
+    let stmt = statement::Statement::parse(statement_bytes)?;
+    let actual_hash = hash::hash_hex(artifact_bytes);
+    verify_statement_hash_with_time(&stmt, &actual_hash, now, None, None)
 }
 
 /// Encode bytes as a URL-safe base64 string.

@@ -11,3 +11,7 @@ clap = { version = "4", features = ["derive"] }
 miette = { version = "7", features = ["fancy"] }
 tempfile = "3"
 hex = { version = "0.4", default-features = false }
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+rpassword = "7"

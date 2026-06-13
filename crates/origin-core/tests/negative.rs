@@ -227,7 +227,11 @@ fn test_sign_verify_wrong_data() {
     let secret = SecretKey::from_bytes(&[2u8; 32]).unwrap();
     let stmt = build_statement(&secret, b"original data", 200).unwrap();
     let result = verify_statement(&stmt, b"tampered data");
-    assert!(matches!(result, Err(Error::HashMismatch { .. })));
+    assert!(
+        matches!(result, Err(Error::ContentMismatch { .. })),
+        "expected ContentMismatch error, got: {:?}",
+        result
+    );
 }
 
 #[test]
@@ -258,11 +262,15 @@ fn test_sign_verify_wrong_key() {
         sig_b64,
         sig_bytes: sig.0,
         raw_lines,
+        semantic_hash: [0u8; 32],
+        semantic_model_ver: 0,
+        policy_hash: [0u8; 32],
+        parent_poo_hash: [0u8; 16],
     };
     let result = verify_statement(&tampered, b"some data");
     assert!(
-        matches!(result, Err(Error::Crypto(_))),
-        "expected Crypto error, got: {:?}",
+        matches!(result, Err(Error::SignatureInvalid(_))),
+        "expected SignatureInvalid error, got: {:?}",
         result
     );
 }

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // OMEGA CRUCIBLE — Domain 9: The "Absolute Zero" Cryptographic Vectors
 
+use origin_core::crypto::{SecretKey, Signature, generate_keypair_from_seed, sign, verify, compute_key_id};
 use origin_core::binary::ProofOfOrigin;
-use origin_core::crypto::{SecretKey, Signature, generate_keypair_from_seed, sign, verify};
 use origin_core::hash::hash_bytes;
 use origin_core::statement::{build_statement, verify_statement};
 
@@ -87,9 +87,9 @@ fn test_policy_hash_commitment_swap() {
     let poo = ProofOfOrigin::from_statement(&stmt).unwrap();
     let mut bytes = poo.to_bytes();
 
-    // Swap the hash field (bytes 18..50) with a different hash
+    // Swap the content_hash field (bytes 53..85) with a different hash
     let fake_hash = hash_bytes(b"different-payload");
-    bytes[18..50].copy_from_slice(&fake_hash);
+    bytes[53..85].copy_from_slice(&fake_hash);
 
     let parsed = ProofOfOrigin::from_bytes(&bytes).unwrap();
     let parsed_stmt = parsed.to_statement().unwrap();
@@ -109,16 +109,16 @@ fn test_pubkey_commitment_swap() {
     let poo = ProofOfOrigin::from_statement(&stmt).unwrap();
     let mut bytes = poo.to_bytes();
 
-    // Swap the pubkey field with a different key
+    // Swap the public_key field with a different key's public_key
     let kp2 = generate_keypair_from_seed(&secret2.0);
-    bytes[50..82].copy_from_slice(&kp2.public.0);
+    bytes[1..33].copy_from_slice(&kp2.public.0);
 
     let parsed = ProofOfOrigin::from_bytes(&bytes).unwrap();
     let parsed_stmt = parsed.to_statement().unwrap();
     let result = verify_statement(&parsed_stmt, payload);
     assert!(
         result.is_err(),
-        "Pubkey commitment swap must be detected by verification"
+        "Public key commitment swap must be detected by verification"
     );
 }
 
@@ -135,7 +135,7 @@ fn test_signature_commitment_swap() {
     let mut bytes = poo2.to_bytes();
 
     // Replace signature in poo2 bytes with signature from stmt1
-    bytes[82..146].copy_from_slice(&stmt1.sig_bytes);
+    bytes[192..256].copy_from_slice(&stmt1.sig_bytes);
 
     let parsed = ProofOfOrigin::from_bytes(&bytes).unwrap();
     let parsed_stmt = parsed.to_statement().unwrap();

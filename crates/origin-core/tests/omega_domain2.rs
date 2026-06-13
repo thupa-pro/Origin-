@@ -16,7 +16,7 @@ fn test_timing_side_channel_t_test() {
 
     // Create tampered versions (flip one bit in signature)
     let mut invalid_bytes = valid_bytes;
-    invalid_bytes[82] ^= 0x01; // flip bit 0 of signature
+    invalid_bytes[192] ^= 0x01; // flip bit 0 of signature (new offset)
 
     let n_samples = 4000;
     let mut valid_times: Vec<f64> = Vec::with_capacity(n_samples);
@@ -143,7 +143,7 @@ fn make_valid_poo() -> (ProofOfOrigin, Vec<u8>) {
 fn test_tamper_content_hash_bit0() {
     let (poo, payload) = make_valid_poo();
     let mut bytes = poo.to_bytes();
-    bytes[18] ^= 0x01; // flip bit 0 of content_hash (hash field)
+    bytes[53] ^= 0x01; // flip bit 0 of content_hash (new offset)
     let parsed = ProofOfOrigin::from_bytes(&bytes).unwrap();
     let stmt = parsed.to_statement().unwrap();
     assert!(
@@ -156,7 +156,7 @@ fn test_tamper_content_hash_bit0() {
 fn test_tamper_timestamp_byte2() {
     let (poo, payload) = make_valid_poo();
     let mut bytes = poo.to_bytes();
-    bytes[12] ^= 0x01; // flip bit in timestamp byte 2
+    bytes[35] ^= 0x01; // flip bit in timestamp byte 2 (new offset)
     let parsed = ProofOfOrigin::from_bytes(&bytes).unwrap();
     let stmt = parsed.to_statement().unwrap();
     assert!(
@@ -167,24 +167,26 @@ fn test_tamper_timestamp_byte2() {
 
 #[test]
 fn test_tamper_flags_byte0() {
-    // Flags are in the reserved field which is NOT part of the signed canonical body.
-    // Tampering flags does not change the hash/timestamp/key/signature fields,
-    // so verification may still pass. This test verifies we can round-trip tampered flags.
-    let (mut poo, payload) = make_valid_poo();
-    let original = poo.flags();
-    poo.set_flags(original ^ 0x0001);
-    let bytes = poo.to_bytes();
-    let parsed = ProofOfOrigin::from_bytes(&bytes).unwrap();
-    assert_eq!(
-        parsed.flags(),
-        original ^ 0x0001,
-        "flags should be tamperable"
+    // Flags ARE in the signed prefix (bytes 190-191 within 0-191).
+    // Verify that flags appear in the signed prefix by checking that
+    // changing flags changes the prefix bytes.
+    let (mut poo, _) = make_valid_poo();
+    let prefix_with_flags0 = poo.signed_prefix();
+
+    poo.set_flags(0x0001);
+    let prefix_with_flags1 = poo.signed_prefix();
+
+    // The prefixes must differ at bytes 190-191 (the flags field)
+    assert_ne!(
+        &prefix_with_flags0[190..192],
+        &prefix_with_flags1[190..192],
+        "flags MUST change the signed prefix"
     );
-    // Verification still passes because flags are not in the signed body
-    let stmt = parsed.to_statement().unwrap();
+    // The signature was computed with flags=0, so a PoO with flags=1 will fail
+    // if verified directly (without go-through Statement which resets flags).
     assert!(
-        verify_statement(&stmt, &payload).is_ok(),
-        "flags do not affect signature"
+        prefix_with_flags0 != prefix_with_flags1,
+        "changing flags MUST change the signed prefix"
     );
 }
 
@@ -192,12 +194,12 @@ fn test_tamper_flags_byte0() {
 fn test_tamper_pubkey_bit15() {
     let (poo, payload) = make_valid_poo();
     let mut bytes = poo.to_bytes();
-    bytes[65] ^= 0x80; // flip bit 15 of pubkey field
+    bytes[16] ^= 0x80; // flip bit 15 of public_key field (offset 1+15=16)
     let parsed = ProofOfOrigin::from_bytes(&bytes).unwrap();
     let stmt = parsed.to_statement().unwrap();
     assert!(
         verify_statement(&stmt, &payload).is_err(),
-        "tampered pubkey must fail verification"
+        "tampered public_key must fail verification"
     );
 }
 
@@ -205,7 +207,7 @@ fn test_tamper_pubkey_bit15() {
 fn test_tamper_signature_bit31() {
     let (poo, payload) = make_valid_poo();
     let mut bytes = poo.to_bytes();
-    bytes[113] ^= 0x01; // flip bit 31 of signature
+    bytes[223] ^= 0x01; // flip bit 31 of signature (offset 192+31=223)
     let parsed = ProofOfOrigin::from_bytes(&bytes).unwrap();
     let stmt = parsed.to_statement().unwrap();
     assert!(

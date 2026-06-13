@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-//! Multi-modal hashing utilities for the Origin provenance library.
-//!
-//! Provides:
-//! - [`hash_bytes`] / [`hash_hex`]: standard SHA-256
-//! - [`hash_reader`]: streaming SHA-256 (requires `std`)
-//! - [`phash_64`]: perceptual hash using fixed-point integer DCT (requires `std`)
-//! - [`simhash_256`]: semantic hash using random projection (requires `std`)
-
 use sha2::{Digest, Sha256};
 
 /// Compute the SHA-256 hash of the given byte slice.
+///
+/// **Canonical format**: The input bytes are hashed as-is with no normalization.
+/// Artifact bytes must be in their canonical form before hashing. The protocol
+/// does not perform any encoding conversion, line-ending normalization, or
+/// byte-order transformation.
 pub fn hash_bytes(data: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(data);
@@ -32,9 +29,7 @@ pub fn hash_reader(mut reader: impl std::io::Read) -> crate::error::Result<[u8; 
     let mut hasher = Sha256::new();
     let mut buf = [0u8; 65536];
     loop {
-        let n = reader
-            .read(&mut buf)
-            .map_err(|e| crate::error::Error::Io(e.to_string()))?;
+        let n = reader.read(&mut buf).map_err(|e| crate::error::Error::Io(e.to_string()))?;
         if n == 0 {
             break;
         }
@@ -55,106 +50,141 @@ pub fn hash_file(path: &std::path::Path) -> crate::error::Result<alloc::string::
     Ok(hex::encode(hash))
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// PERCEPTUAL HASH (pHash) — Fixed-Point Integer DCT
-// ═══════════════════════════════════════════════════════════════════
-// Uses i32 with fixed-point arithmetic for cross-platform determinism.
-// No floating-point DCT means bit-identical results on ARM, x86, WASM.
+// ═══════════════════════════════════════════════
+// PERCEPTUAL HASH (pHash) — Fix-Point DCT
+// ═══════════════════════════════════════════════
+
+/// Convert RGB pixel data to grayscale using exact BT.601 coefficients.
+/// Input: width * height * 3 bytes (R, G, B interleaved).
+/// Output: width * height grayscale bytes.
+#[cfg(feature = "std")]
+pub fn rgb_to_grayscale(pixels: &[u8], width: usize, height: usize) -> alloc::vec::Vec<u8> {
+    let mut gray = alloc::vec![0u8; width * height];
+    for y in 0..height {
+        for x in 0..width {
+            let idx = (y * width + x) * 3;
+            let r = pixels[idx] as u32;
+            let g = pixels[idx + 1] as u32;
+            let b = pixels[idx + 2] as u32;
+            let v = (299 * r + 587 * g + 114 * b) / 1000;
+            gray[y * width + x] = v.min(255) as u8;
+        }
+    }
+    gray
+}
+
+/// Bilinear interpolation to resize a grayscale image.
+#[cfg(feature = "std")]
+pub fn resize_bilinear(src: &[u8], src_w: usize, src_h: usize, dst_w: usize, dst_h: usize) -> alloc::vec::Vec<u8> {
+    let mut dst = alloc::vec![0u8; dst_w * dst_h];
+    for dy in 0..dst_h {
+        for dx in 0..dst_w {
+            let gx = (dx as f64 + 0.5) * src_w as f64 / dst_w as f64 - 0.5;
+            let gy = (dy as f64 + 0.5) * src_h as f64 / dst_h as f64 - 0.5;
+            let ix = gx.max(0.0).min((src_w - 1) as f64);
+            let iy = gy.max(0.0).min((src_h - 1) as f64);
+            let x0 = ix.floor() as usize;
+            let y0 = iy.floor() as usize;
+            let x1 = (x0 + 1).min(src_w - 1);
+            let y1 = (y0 + 1).min(src_h - 1);
+            let fx = ix - x0 as f64;
+            let fy = iy - y0 as f64;
+            let v00 = src[y0 * src_w + x0] as f64;
+            let v10 = src[y0 * src_w + x1] as f64;
+            let v01 = src[y1 * src_w + x0] as f64;
+            let v11 = src[y1 * src_w + x1] as f64;
+            let v = v00 * (1.0 - fx) * (1.0 - fy)
+                + v10 * fx * (1.0 - fy)
+                + v01 * (1.0 - fx) * fy
+                + v11 * fx * fy;
+            dst[dy * dst_w + dx] = v.round().min(255.0).max(0.0) as u8;
+        }
+    }
+    dst
+}
 
 /// Compute a 64-bit perceptual hash of a 32x32 grayscale image.
-///
-/// Uses only integer arithmetic (fixed-point DCT).
+/// Uses 2D DCT Type II with orthogonal normalization.
 /// Returns a 64-bit hash where each bit represents a DCT coefficient
-/// being above or below the median.
+/// being above or below the mean (DC coefficient at [0,0] excluded).
 #[cfg(feature = "std")]
 pub fn phash_64(pixels_32x32: &[[u8; 32]; 32]) -> u64 {
-    // Step 1: Downscale 32x32 to 8x8 via 4x4 block averaging
-    let mut reduced = [[0i32; 8]; 8];
-    for py in 0..8 {
-        for px in 0..8 {
-            let mut sum = 0i32;
-            for dy in 0..4 {
-                for dx in 0..4 {
-                    sum += pixels_32x32[py * 4 + dy][px * 4 + dx] as i32;
-                }
-            }
-            reduced[py][px] = sum / 16;
+    // Convert to i32 and subtract 128 for DCT centering
+    let mut centered = [[0i32; 32]; 32];
+    for (y, row) in pixels_32x32.iter().enumerate() {
+        for (x, p) in row.iter().enumerate() {
+            centered[y][x] = *p as i32 - 128;
         }
     }
 
-    // Step 2: Fixed-point 2D DCT of 8x8
-    let dct = dct_8x8_fixed(&reduced);
+    // 2D DCT Type II on 32x32, then extract top-left 8x8
+    let dct = dct_2d_32x32(&centered);
 
-    // Step 3: Compute median of AC coefficients (skip DC at 0,0)
-    let mut coeffs = [0i32; 63];
-    let mut idx = 0;
-    for (y, row) in dct.iter().enumerate() {
-        for (x, val) in row.iter().enumerate() {
+    // Extract top-left 8x8 sub-matrix
+    let mut coeffs_8x8 = [[0i32; 8]; 8];
+    for y in 0..8 {
+        for x in 0..8 {
+            coeffs_8x8[y][x] = dct[y][x];
+        }
+    }
+
+    // Compute mean of 64 values (excluding DC at [0,0])
+    let mut sum: i64 = 0;
+    for y in 0..8 {
+        for x in 0..8 {
             if x == 0 && y == 0 {
                 continue;
             }
-            coeffs[idx] = *val;
-            idx += 1;
+            sum += coeffs_8x8[y][x] as i64;
         }
     }
-    coeffs.sort_unstable();
-    let median = coeffs[31];
+    let mean = sum / 63;
 
-    // Step 4: Generate 64-bit hash from 8x8 DCT vs median
+    // Generate 64-bit hash: bit = 1 if DCT_value >= mean
+    // Packed big-endian: byte 0 = MSB (coefficient[0][1]), byte 7 = LSB
     let mut hash: u64 = 0;
-    for (y, row) in dct.iter().enumerate() {
-        for (x, val) in row.iter().enumerate() {
-            let bit_idx = (y * 8 + x) as u64;
-            if *val > median {
-                hash |= 1u64 << bit_idx;
+    let mut bit_idx = 0;
+    for y in 0..8 {
+        for x in 0..8 {
+            if x == 0 && y == 0 {
+                continue;
             }
+            if coeffs_8x8[y][x] as i64 >= mean {
+                hash |= 1u64 << (63 - bit_idx); // big-endian packing
+            }
+            bit_idx += 1;
         }
     }
     hash
 }
 
-/// Fixed-point 2D DCT of an 8x8 block using Q16.16 arithmetic.
-/// Input values are pixel levels (0-255), shifted by -128 for DCT.
-fn dct_8x8_fixed(input: &[[i32; 8]; 8]) -> [[i32; 8]; 8] {
-    let frac_bits = 12;
-    let scale = 1i64 << frac_bits;
+/// 2D DCT Type II on a 32x32 block with orthogonal normalization.
+#[cfg(feature = "std")]
+fn dct_2d_32x32(input: &[[i32; 32]; 32]) -> [[i32; 32]; 32] {
+    const N: usize = 32;
+    let mut result = [[0i32; N]; N];
 
-    // Precompute cosine table in fixed-point
-    let mut cos_tab = [[0i64; 8]; 8];
-    for (i, row) in cos_tab.iter_mut().enumerate() {
-        for (j, val) in row.iter_mut().enumerate() {
-            let angle = (i as f64 + 0.5) * j as f64 * core::f64::consts::PI / 8.0;
-            *val = (angle.cos() * scale as f64).round() as i64;
+    // Precompute cosine table
+    let mut cos_tab = [[0.0f64; N]; N];
+    for i in 0..N {
+        for j in 0..N {
+            cos_tab[i][j] = (core::f64::consts::PI * (i as f64 + 0.5) * j as f64 / N as f64).cos();
         }
     }
 
-    let mut result = [[0i32; 8]; 8];
-
-    for u in 0..8 {
-        for v in 0..8 {
-            let mut sum: i64 = 0;
-            for (x, row) in input.iter().enumerate() {
-                for (y, val) in row.iter().enumerate() {
-                    let shifted = (*val as i64) - 128;
-                    sum += shifted * cos_tab[x][u] * cos_tab[y][v];
+    for u in 0..N {
+        for v in 0..N {
+            let mut sum = 0.0f64;
+            for x in 0..N {
+                for y in 0..N {
+                    sum += input[x][y] as f64 * cos_tab[x][u] * cos_tab[y][v];
                 }
             }
-
-            // Normalization: C(u) * C(v) where C(0) = 1/sqrt(2), C(k>0) = 1
-            // Our cos table includes a factor of scale, so adjust:
-            // DCT(u,v) = (2/N) * C(u) * C(v) * sum
-            // where C(0) = 1/sqrt(2), C(k>0) = 1, N = 8
-            let norm = if u == 0 && v == 0 {
-                4i64 // (2/8) * (1/2) = 1/8 * 32 = 4 at scale
-            } else if u == 0 || v == 0 {
-                8i64 // (2/8) * (1/sqrt(2)) - approximate
-            } else {
-                16i64 // (2/8) * 1
-            };
-
-            // sum is in Q24 (cos^2 * input), divide by scale^2 then normalize
-            let dct_val = sum / (scale * scale / norm);
-            result[u][v] = dct_val as i32;
+            // Orthogonal normalization: C(u) * C(v) where C(0) = 1/sqrt(2), C(k>0) = 1
+            let cu = if u == 0 { 1.0 / core::f64::consts::SQRT_2 } else { 1.0 };
+            let cv = if v == 0 { 1.0 / core::f64::consts::SQRT_2 } else { 1.0 };
+            let norm = (2.0 / N as f64) * cu * cv;
+            result[u][v] = (sum * norm).round() as i32;
         }
     }
     result
@@ -169,12 +199,26 @@ pub fn phash_hamming_distance(a: u64, b: u64) -> u32 {
 /// Classification of perceptual hash match levels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MatchLevel {
-    /// Exact match (Hamming distance == 0)
     Exact,
-    /// Similar (Hamming distance < 10)
     Similar,
-    /// Different
     Different,
+}
+
+/// Compute a 16-byte perceptual hash field for non-image artifacts (FORMAT_UNKNOWN).
+///
+/// For artifacts where image-based pHash is not applicable (e.g., source code,
+/// binaries, text), this produces a deterministic 16-byte field suitable for
+/// direct storage in `ProofOfOrigin::perceptual_hash`.
+///
+/// Formula: SHA-256(b"FORMAT_UNKNOWN" || content_hash)[0..16]
+pub fn phash_format_unknown(content_hash: &[u8; 32]) -> [u8; 16] {
+    let mut input = alloc::vec![0u8; 48];
+    input[..16].copy_from_slice(b"FORMAT_UNKNOWN\0\0");
+    input[16..48].copy_from_slice(content_hash);
+    let h = hash_bytes(&input);
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&h[..16]);
+    bytes
 }
 
 /// Classify two perceptual hashes by their Hamming distance.
@@ -190,28 +234,22 @@ pub fn classify_match(a: u64, b: u64) -> MatchLevel {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════
 // SEMANTIC HASH (SimHash) — Random Projection
-// ═══════════════════════════════════════════════════════════════════
-// Uses a deterministic random projection matrix seeded via fixed seed
-// (ChaCha20 with seed = SHA-256("origin-network-simhash-seed-v1")).
+// ═══════════════════════════════════════════════
 
 const SIMHASH_SEED: &[u8] = b"origin-network-simhash-seed-v1";
 
 /// Compute a 256-bit SimHash of a 512-dimensional feature vector.
-///
-/// Uses random projection with a deterministic Gaussian matrix
-/// (seeded from SHA-256 of a fixed string). The result is 32 bytes
-/// (256 bits) where each bit is the sign of a random dot product.
 #[cfg(feature = "std")]
 pub fn simhash_256(features: &[f64; 512]) -> [u8; 32] {
     use rand_chacha::ChaCha20Rng;
     use rand_core::SeedableRng;
+    use rand_core::RngCore;
 
     let seed_bytes = hash_bytes(SIMHASH_SEED);
     let mut rng = ChaCha20Rng::from_seed(seed_bytes);
 
-    use rand_core::RngCore;
     let mut hash = [0u8; 32];
     for bit_idx in 0..256 {
         let mut dot: f64 = 0.0;
@@ -282,10 +320,6 @@ mod tests {
         assert_eq!(hash1, hash2);
     }
 
-    // ══════════════════════════════════════════════════════════════
-    // DOMAIN 3: pHash Determinism Tests
-    // ══════════════════════════════════════════════════════════════
-
     #[cfg(feature = "std")]
     #[test]
     fn test_phash_deterministic_100_runs() {
@@ -323,11 +357,32 @@ mod tests {
         let hash_base = phash_64(&base);
         let hash_mod = phash_64(&modified);
         let dist = phash_hamming_distance(hash_base, hash_mod);
-        assert!(
-            dist < 10,
-            "Similar images should have Hamming distance < 10, got {}",
-            dist
-        );
+        assert!(dist < 10, "Similar images should have Hamming distance < 10, got {}", dist);
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_rgb_to_grayscale() {
+        let rgb = [10, 20, 30, 100, 150, 200];
+        let gray = rgb_to_grayscale(&rgb, 1, 2);
+        // gray = 0.299R + 0.587G + 0.114B
+        let expected0 = ((299 * 10 + 587 * 20 + 114 * 30) / 1000) as u8;
+        let expected1 = ((299 * 100 + 587 * 150 + 114 * 200) / 1000) as u8;
+        assert_eq!(gray[0], expected0);
+        assert_eq!(gray[1], expected1);
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_resize_bilinear() {
+        let mut src = alloc::vec![0u8; 256]; // 16x16 checkerboard
+            for i in 0..16 {
+                for j in 0..16 {
+                    src[i * 16 + j] = if (i / 2 + j / 2) % 2 == 0 { 255 } else { 0 };
+                }
+            }
+        let dst = resize_bilinear(&src, 16, 16, 32, 32);
+        assert_eq!(dst.len(), 1024); // 32 * 32
     }
 
     #[cfg(feature = "std")]
@@ -339,10 +394,6 @@ mod tests {
         assert_eq!(classify_match(h, h), MatchLevel::Exact);
     }
 
-    // ══════════════════════════════════════════════════════════════
-    // DOMAIN 3: SimHash Determinism Tests
-    // ══════════════════════════════════════════════════════════════
-
     #[cfg(feature = "std")]
     #[test]
     fn test_simhash_deterministic_100_runs() {
@@ -350,11 +401,10 @@ mod tests {
         for (i, feat) in features.iter_mut().enumerate() {
             *feat = (i as f64) / 512.0;
         }
-
         let first = simhash_256(&features);
         for _ in 0..100 {
             let hash = simhash_256(&features);
-            assert_eq!(hash, first, "SimHash must be deterministic across runs");
+            assert_eq!(hash, first, "SimHash must be deterministic");
         }
     }
 

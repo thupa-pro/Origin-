@@ -13,11 +13,17 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use argon2::Argon2;
+use chacha20poly1305::{
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+    XChaCha20Poly1305,
+};
 use clap::{Parser, Subcommand};
 use origin_core::{
     Statement, Verdict, audit, base64_encode, build_statement_from_hash, encode_statement,
-    generate_keypair, hash_reader, verify_statement_hash,
+    generate_keypair, hash_reader, verify_statement_hash_with_time,
 };
+use rpassword::prompt_password;
 
 fn to_err(e: origin_core::Error) -> miette::Report {
     miette::miette!("{}", e)
@@ -62,6 +68,9 @@ enum Command {
         /// Optional trusted public key (base64url, 44 chars)
         #[arg(long)]
         key: Option<String>,
+        /// Optional current time for clock-skew check (default: system time)
+        #[arg(long)]
+        time: Option<u64>,
     },
     /// Display fields of a .origin statement without verifying
     Audit {
@@ -88,10 +97,60 @@ enum Command {
     },
 }
 
+fn derive_key(passphrase: &str, salt: &[u8; 16]) -> [u8; 32] {
+    let mut key = [0u8; 32];
+    Argon2::default().hash_password_into(passphrase.as_bytes(), salt, &mut key)
+        .expect("Argon2 hashing cannot fail with valid inputs");
+    key
+}
+
+fn encrypt_secret_key(secret: &[u8; 32], passphrase: &str) -> miette::Result<Vec<u8>> {
+    let salt: [u8; 16] = rand::random();
+    let key = derive_key(passphrase, &salt);
+    let cipher = XChaCha20Poly1305::new(&key.into());
+    let nonce = XChaCha20Poly1305::generate_nonce(&mut OsRng);
+    let ciphertext = cipher.encrypt(&nonce, secret.as_ref())
+        .map_err(|e| miette::miette!("encryption failed: {}", e))?;
+    let mut output = Vec::with_capacity(16 + 24 + ciphertext.len());
+    output.extend_from_slice(&salt);
+    output.extend_from_slice(&nonce);
+    output.extend_from_slice(&ciphertext);
+    Ok(output)
+}
+
+fn decrypt_secret_key(data: &[u8], passphrase: &str) -> miette::Result<[u8; 32]> {
+    if data.len() < 16 + 24 {
+        return Err(miette::miette!("invalid encrypted key file: too short"));
+    }
+    let salt: [u8; 16] = data[0..16].try_into()
+        .expect("first 16 bytes are salt");
+    let nonce: [u8; 24] = data[16..40].try_into()
+        .expect("bytes 16-39 are nonce");
+    let ciphertext = &data[40..];
+    let key = derive_key(passphrase, &salt);
+    let cipher = XChaCha20Poly1305::new(&key.into());
+    let plaintext = cipher.decrypt((&nonce).into(), ciphertext)
+        .map_err(|_| miette::miette!("decryption failed: incorrect passphrase or corrupted file"))?;
+    let mut secret = [0u8; 32];
+    secret.copy_from_slice(&plaintext);
+    Ok(secret)
+}
+
 fn read_secret_key(path: &std::path::Path) -> miette::Result<origin_core::SecretKey> {
-    let bytes = std::fs::read(path)
+    let data = std::fs::read(path)
         .map_err(|e| miette::miette!("failed to read secret key '{}': {}", path.display(), e))?;
-    origin_core::SecretKey::from_bytes(&bytes).map_err(to_err)
+    
+    // Check if file is encrypted (has salt+nonce+ciphertext structure)
+    if data.len() >= 40 && data.len() > 40 {
+        // Prompt for passphrase
+        let passphrase = prompt_password("Enter passphrase for secret key: ")
+            .map_err(|e| miette::miette!("failed to read passphrase: {}", e))?;
+        let secret = decrypt_secret_key(&data, &passphrase)?;
+        return origin_core::SecretKey::from_bytes(&secret).map_err(to_err);
+    }
+    
+    // Legacy: raw 32-byte key
+    origin_core::SecretKey::from_bytes(&data).map_err(to_err)
 }
 
 fn timestamp_now() -> u64 {
@@ -137,6 +196,21 @@ fn run(cli: Cli) -> miette::Result<Verdict> {
         } => {
             let secret = read_secret_key(&key)?;
             let ts = time.unwrap_or_else(timestamp_now);
+
+            // P1.8: Warn when --time is more than 5 minutes in the future
+            if time.is_some() {
+                let now = timestamp_now();
+                if ts > now.saturating_add(300) {
+                    eprintln!(
+                        "W002 WARNING: --time {} is {}s in the future (now={}). \
+                         This may indicate backdating or clock skew.",
+                        ts,
+                        ts.saturating_sub(now),
+                        now
+                    );
+                }
+            }
+
             let (hash, hash_hex) = hash_artifact(&artifact)?;
             let stmt = build_statement_from_hash(&secret, &hash_hex, &hash, ts).map_err(to_err)?;
 
@@ -160,6 +234,7 @@ fn run(cli: Cli) -> miette::Result<Verdict> {
             artifact,
             origin,
             key,
+            time,
         } => {
             let statement_bytes = match read_small_file(&origin) {
                 Ok(b) => b,
@@ -185,7 +260,8 @@ fn run(cli: Cli) -> miette::Result<Verdict> {
             }
 
             let (_hash, actual_hash_hex) = hash_artifact(&artifact)?;
-            Ok(verify_statement_hash(&stmt, &actual_hash_hex))
+            let now = time.or_else(|| Some(timestamp_now()));
+            Ok(verify_statement_hash_with_time(&stmt, &actual_hash_hex, now, None, None))
         }
 
         Command::Audit { origin } => {
@@ -235,11 +311,16 @@ fn run(cli: Cli) -> miette::Result<Verdict> {
             let secret_path = PathBuf::from(format!("{}.key", output));
             let public_path = PathBuf::from(format!("{}.pub", output));
 
-            atomic_write(&secret_path, &kp.secret.0)?;
+            let passphrase = prompt_password("Enter passphrase to encrypt secret key: ")
+                .map_err(|e| miette::miette!("failed to read passphrase: {}", e))?;
+            let encrypted = encrypt_secret_key(&kp.secret.0, &passphrase)?;
+            atomic_write(&secret_path, &encrypted)?;
+            
             let pub_b64 = base64_encode(&kp.public.0);
             atomic_write(&public_path, pub_b64.as_bytes())?;
 
-            eprintln!("Secret key: {}", secret_path.display());
+            eprintln!("W001 WARNING: Encrypted secret key written to '{}'. Do not commit or share this file.", secret_path.display());
+            eprintln!("Secret key (encrypted): {}", secret_path.display());
             eprintln!("Public key: {} ({})", pub_b64, public_path.display());
             Ok(Ok(()))
         }
